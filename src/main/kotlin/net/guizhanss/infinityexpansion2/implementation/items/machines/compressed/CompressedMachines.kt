@@ -66,7 +66,7 @@ object CompressedMachines {
             )
 
             // the recipe is only used for displaying, the actual crafting is done in the machine compressor
-            val input = ItemStack(spec.baseStack).apply { amount = FACTOR }
+            val input = spec.baseStack.clone().apply { amount = FACTOR }
             val recipe = arrayOf<ItemStack?>(input, null, null, null, null, null, null, null, null)
 
             val args = arrayOf(IEItemGroups.COMPRESSED, stack, IERecipeTypes.MACHINE_COMPRESSOR, recipe, *spec.args.toTypedArray())
@@ -89,8 +89,8 @@ object CompressedMachines {
      * Compressed machines are decompressed with the Grind Stone.
      */
     private fun registerDecompressRecipe(compressed: SlimefunItemStack, base: SlimefunItemStack) {
-        val input = ItemStack(compressed).apply { amount = 1 }
-        val output = ItemStack(base).apply { amount = FACTOR }
+        val input = compressed.clone().apply { amount = 1 }
+        val output = base.clone().apply { amount = FACTOR }
         RecipeType.GRIND_STONE.register(arrayOf(input), output)
     }
 }

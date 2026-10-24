@@ -25,8 +25,8 @@ class MachineCompressor(
 
     init {
         for ((base, compressed) in IERegistry.compressedMachines) {
-            val input = ItemStack(base).apply { amount = CompressedMachines.FACTOR }
-            addRecipe(input, ItemStack(compressed))
+            val input = base.clone().apply { amount = CompressedMachines.FACTOR }
+            addRecipe(input, compressed.clone())
         }
     }
 }

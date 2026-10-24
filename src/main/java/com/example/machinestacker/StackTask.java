@@ -2,7 +2,6 @@ package com.example.machinestacker;
 
 import io.github.thebusybiscuit.slimefun4.api.items.SlimefunItem;
 import me.mrCookieSlime.Slimefun.api.BlockStorage;
-import io.github.thebusybiscuit.slimefun4.core.handlers.BlockTicker;
 import org.bukkit.Location;
 import org.bukkit.block.Block;
 
@@ -38,7 +37,7 @@ public class StackTask implements Runnable {
                 continue;
             }
 
-            BlockTicker ticker = item.getBlockTicker();
+            var ticker = item.getBlockTicker();
             if (ticker == null) {
                 continue;
             }

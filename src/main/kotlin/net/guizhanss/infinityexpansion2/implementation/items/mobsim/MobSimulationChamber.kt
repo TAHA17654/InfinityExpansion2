@@ -75,6 +75,9 @@ class MobSimulationChamber(
     // the compressed chamber reads the cards from the input buffer, the slot cannot hold a stack of cards
     override val stagesBufferedInput get() = false
 
+    // a compressed chamber takes at most 64 data cards
+    override val bufferedInputLimit get() = MAX_CARDS
+
     override fun isBufferedInput(item: ItemStack): Boolean {
         if (!item.isSlimefunItem<MobDataCard>()) return false
         val id = MobDataCard.getMobDataId(item) ?: return false
@@ -248,6 +251,7 @@ class MobSimulationChamber(
 
     companion object {
 
+        private const val MAX_CARDS = 64
         private const val ENERGY_CONSUMPTION_SLOT = 5
         private const val XP_SLOT = 8
         private const val XP_KEY = "xp"
@@ -276,7 +280,7 @@ class MobSimulationChamber(
          * Returns the [MobDataCardProps] and the amount of the cards.
          */
         private fun BlockMenu.getBufferedDataCard(): Pair<MobDataCardProps, Int>? {
-            val (card, amount) = OutputBuffer.inputOf(this).first() ?: return null
+            val (card, amount) = OutputBuffer.inputOf(this, MAX_CARDS).first() ?: return null
             val id = MobDataCard.getMobDataId(card) ?: return null
             val props = IERegistry.mobDataCards[id] ?: return null
 

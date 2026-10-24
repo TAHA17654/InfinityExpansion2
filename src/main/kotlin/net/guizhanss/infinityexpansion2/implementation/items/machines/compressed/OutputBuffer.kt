@@ -28,7 +28,11 @@ import java.util.concurrent.locks.ReentrantLock
  * normal stacks in the slots. The output slots are refilled from the buffer every tick, so hoppers, cargo
  * and players still interact with ordinary item stacks.
  */
-class OutputBuffer private constructor(private val location: Location, private val key: String) {
+class OutputBuffer private constructor(
+    private val location: Location,
+    private val key: String,
+    private val limit: Int = LIMIT,
+) {
 
     private class Entry(val template: ItemStack, val serialized: String, var amount: Int)
 
@@ -46,7 +50,7 @@ class OutputBuffer private constructor(private val location: Location, private v
      * Whether at least one item type in the buffer has reached [LIMIT].
      */
     @Synchronized
-    fun isFull() = entries.any { it.amount >= LIMIT }
+    fun isFull() = entries.any { it.amount >= limit }
 
     /**
      * Moves the items in the given [slots] into the buffer. Only the items accepted by [accept] are moved.
@@ -66,7 +70,7 @@ class OutputBuffer private constructor(private val location: Location, private v
                 entries.add(entry)
             }
 
-            val moved = minOf(item!!.amount, LIMIT - entry.amount)
+            val moved = minOf(item!!.amount, limit - entry.amount)
             if (moved <= 0) {
                 if (entry.amount <= 0) entries.remove(entry)
                 continue
@@ -96,7 +100,7 @@ class OutputBuffer private constructor(private val location: Location, private v
             entries.add(entry)
         }
 
-        val moved = minOf(count, LIMIT - entry.amount)
+        val moved = minOf(count, limit - entry.amount)
         if (moved <= 0) {
             if (entry.amount <= 0) entries.remove(entry)
             return 0
@@ -223,7 +227,7 @@ class OutputBuffer private constructor(private val location: Location, private v
     @Synchronized
     fun lines(): List<String> = entries.map {
         ChatUtil.color(
-            "&7${ItemUtils.getItemName(it.template)}&8: &e${NUMBER_FORMAT.format(it.amount)} &7/ &e${NUMBER_FORMAT.format(LIMIT)}"
+            "&7${ItemUtils.getItemName(it.template)}&8: &e${NUMBER_FORMAT.format(it.amount)} &7/ &e${NUMBER_FORMAT.format(limit)}"
         )
     }
 
@@ -277,8 +281,8 @@ class OutputBuffer private constructor(private val location: Location, private v
          * Network pushers can only put one normal stack into each input slot, so the input slots are emptied
          * into this buffer every tick, which leaves room for the next push.
          */
-        fun inputOf(menu: BlockMenu): OutputBuffer =
-            inputBuffers.computeIfAbsent(menu.position) { OutputBuffer(menu.location, BS_INPUT) }
+        fun inputOf(menu: BlockMenu, limit: Int = LIMIT): OutputBuffer =
+            inputBuffers.computeIfAbsent(menu.position) { OutputBuffer(menu.location, BS_INPUT, limit) }
 
         /**
          * Forgets the buffers of the machine at the given [menu] and returns the items inside them.

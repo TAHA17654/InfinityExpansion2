@@ -1,3 +1,5 @@
+@file:Suppress("deprecation")
+
 package net.guizhanss.infinityexpansion2.implementation.items.machines.abstracts
 
 import io.github.thebusybiscuit.slimefun4.api.items.ItemGroup
@@ -6,7 +8,10 @@ import io.github.thebusybiscuit.slimefun4.api.items.settings.IntRangeSetting
 import io.github.thebusybiscuit.slimefun4.api.recipes.RecipeType
 import io.github.thebusybiscuit.slimefun4.core.attributes.EnergyNetComponent
 import io.github.thebusybiscuit.slimefun4.core.networks.energy.EnergyNetComponentType
+import io.github.thebusybiscuit.slimefun4.core.handlers.BlockUseHandler
+import me.mrCookieSlime.Slimefun.api.BlockStorage
 import me.mrCookieSlime.Slimefun.api.inventory.BlockMenu
+import net.guizhanss.guizhanlib.minecraft.utils.ChatUtil
 import me.mrCookieSlime.Slimefun.api.inventory.BlockMenuPreset
 import net.guizhanss.guizhanlib.slimefun.machines.TickingMenuBlock
 import net.guizhanss.infinityexpansion2.core.items.attributes.CustomTickRateMachine
@@ -48,6 +53,23 @@ abstract class AbstractTickingMachine(
 
     init {
         addItemSetting(tickRateSetting, energyPerTickSetting)
+
+        // compressed machines only work through their buffers, they have no gui
+        addItemHandler(BlockUseHandler { e ->
+            if (!isCompressed) return@BlockUseHandler
+            val player = e.player
+            if (player.isSneaking) return@BlockUseHandler
+            e.cancel()
+            val block = e.clickedBlock.orElse(null) ?: return@BlockUseHandler
+            val menu = BlockStorage.getInventory(block) ?: return@BlockUseHandler
+            val lines = OutputBuffer.of(menu).lines().map { "  $it" }
+            val input = OutputBuffer.inputOf(menu, bufferedInputLimit).lines().map { "  $it" }
+            player.sendMessage(ChatUtil.color("&bCompressed machine &7- works through its buffers, no gui"))
+            player.sendMessage(ChatUtil.color("&7Output:"))
+            if (lines.isEmpty()) player.sendMessage(ChatUtil.color("  &8empty")) else lines.forEach { player.sendMessage(it) }
+            player.sendMessage(ChatUtil.color("&7Input:"))
+            if (input.isEmpty()) player.sendMessage(ChatUtil.color("  &8empty")) else input.forEach { player.sendMessage(it) }
+        })
     }
 
     /**
@@ -128,6 +150,11 @@ abstract class AbstractTickingMachine(
     protected open val stagesBufferedInput: Boolean get() = true
 
     /**
+     * The maximum amount of each item type in the input buffer of a compressed machine.
+     */
+    open val bufferedInputLimit: Int get() = OutputBuffer.LIMIT
+
+    /**
      * Runs [process] up to [multiplier] times, as if [multiplier] machines were running on the same tick.
      *
      * - The output is moved into the output buffer after each run, so the machine is only blocked when
@@ -142,7 +169,7 @@ abstract class AbstractTickingMachine(
      */
     private fun processCompressed(b: Block, menu: BlockMenu): Int {
         val output = OutputBuffer.of(menu)
-        val input = OutputBuffer.inputOf(menu)
+        val input = OutputBuffer.inputOf(menu, bufferedInputLimit)
         val bufferInput = inputSlots.isNotEmpty()
 
         output.absorb(menu, outputSlots)

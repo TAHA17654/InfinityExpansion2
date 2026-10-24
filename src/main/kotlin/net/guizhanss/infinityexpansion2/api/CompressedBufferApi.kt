@@ -1,6 +1,6 @@
 package net.guizhanss.infinityexpansion2.api
 
-import com.xzavier0722.mc.plugin.slimefun4.storage.util.StorageCacheUtils
+import io.github.thebusybiscuit.slimefun4.api.items.SlimefunItem
 import me.mrCookieSlime.Slimefun.api.inventory.BlockMenu
 import net.guizhanss.infinityexpansion2.implementation.items.machines.abstracts.AbstractTickingMachine
 import net.guizhanss.infinityexpansion2.implementation.items.machines.compressed.OutputBuffer
@@ -32,10 +32,10 @@ object CompressedBufferApi {
      */
     @JvmStatic
     fun stage(menu: BlockMenu): Boolean {
-        val machine = StorageCacheUtils.getSfItem(menu.location) as? AbstractTickingMachine ?: return false
+        val machine = machineOf(menu) ?: return false
         if (!machine.isCompressed || menu.hasViewer()) return false
 
-        val slots = machine.outputSlots
+        val slots = machine.bufferedOutputSlots()
         if (slots.isEmpty()) return false
 
         val lock = OutputBuffer.lockOf(menu)
@@ -62,18 +62,21 @@ object CompressedBufferApi {
         if (!lock.isHeldByCurrentThread) return
 
         try {
-            val machine = StorageCacheUtils.getSfItem(menu.location) as? AbstractTickingMachine ?: return
+            val machine = machineOf(menu) ?: return
             restore(menu, machine)
         } finally {
             lock.unlock()
         }
     }
 
+    private fun machineOf(menu: BlockMenu): AbstractTickingMachine? =
+        SlimefunItem.getById(menu.preset.getID()) as? AbstractTickingMachine
+
     private fun restore(menu: BlockMenu, machine: AbstractTickingMachine) {
         try {
             val buffer = OutputBuffer.of(menu)
-            buffer.absorb(menu, machine.outputSlots)
-            buffer.refill(menu, machine.outputSlots)
+            buffer.absorb(menu, machine.bufferedOutputSlots())
+            buffer.refill(menu, machine.bufferedOutputSlots())
             buffer.save()
         } catch (e: Exception) {
             net.guizhanss.infinityexpansion2.InfinityExpansion2.log(Level.SEVERE, e, "Failed to restore the buffer")

@@ -65,6 +65,11 @@ abstract class AbstractTickingMachine(
 
     val isCompressed: Boolean get() = multiplier > 1
 
+    /**
+     * The output slots that are used by the output buffer, for [net.guizhanss.infinityexpansion2.api.CompressedBufferApi].
+     */
+    fun bufferedOutputSlots(): IntArray = outputSlots
+
     override fun getCustomTickRate() = tickRateSetting.value
 
     override fun getEnergyConsumptionPerTick() =

@@ -26,6 +26,8 @@ import net.guizhanss.infinityexpansion2.implementation.items.machines.AdvancedAn
 import net.guizhanss.infinityexpansion2.implementation.items.machines.CobblePress
 import net.guizhanss.infinityexpansion2.implementation.items.machines.CobblestoneGenerator
 import net.guizhanss.infinityexpansion2.implementation.items.machines.Decompressor
+import net.guizhanss.infinityexpansion2.implementation.items.machines.compressed.CompressedMachines
+import net.guizhanss.infinityexpansion2.implementation.items.machines.compressed.MachineCompressor
 import net.guizhanss.infinityexpansion2.implementation.items.machines.DustExtractor
 import net.guizhanss.infinityexpansion2.implementation.items.machines.ExtremeFreezer
 import net.guizhanss.infinityexpansion2.implementation.items.machines.FlowerGrower
@@ -2371,6 +2373,36 @@ object IEItems : ItemRegistry(InfinityExpansion2.instance, InfinityExpansion2.lo
             'M' means MAGSTEEL
             'B' means Material.BARREL
         }
+    }
+    //</editor-fold>
+
+    //<editor-fold desc="Compressed Machines" defaultstate="collapsed">
+    // all the machines are registered above, now create the compressed version of them
+    private val compressedMachinesRegistered = run {
+        CompressedMachines.registerAll(this)
+        true
+    }
+
+    val MACHINE_COMPRESSOR by buildSlimefunItem<MachineCompressor>(2_000) {
+        material = Material.PISTON.asMaterialType()
+        itemGroup = IEItemGroups.COMPRESSED
+        recipeType = RecipeType.ENHANCED_CRAFTING_TABLE
+        recipe = buildRecipe {
+            +"PPP"
+            +"SDS"
+            +"COC"
+            'P' means MAGSTEEL_PLATE
+            'S' means Material.PISTON
+            'D' means DECOMPRESSOR
+            'C' means MACHINE_CIRCUIT
+            'O' means MACHINE_CORE
+        }
+    }
+
+    val DECOMPRESSION_GUIDE by buildSlimefunItem<SimpleMaterial> {
+        material = Material.GRINDSTONE.asMaterialType()
+        itemGroup = IEItemGroups.DECOMPRESSED
+        recipeType = RecipeType.NULL
     }
     //</editor-fold>
 

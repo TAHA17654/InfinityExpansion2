@@ -39,6 +39,10 @@ object IERecipeTypes {
         IERegistry.storageForgeRecipes.add(MachineRecipe.of(recipe, output))
     }
 
+    val MACHINE_COMPRESSOR = createRecipeType(
+        "machine_compressor", Material.PISTON.asMaterialType()
+    )
+
     private fun createRecipeType(
         key: String, material: MaterialType, callback: ((Array<out ItemStack>, ItemStack) -> Unit)? = null
     ) = RecipeType(

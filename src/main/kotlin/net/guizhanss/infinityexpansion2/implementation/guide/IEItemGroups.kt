@@ -29,6 +29,8 @@ object IEItemGroups {
     val GENERATORS = createSubGroup("generators", Material.BLAST_FURNACE.asMaterialType())
     val MOB_SIMULATION = createSubGroup("mob_simulation", Material.BEACON.asMaterialType())
     val STORAGE = createSubGroup("storage", Material.BEEHIVE.asMaterialType())
+    val COMPRESSED = createSubGroup("compressed", Material.PISTON.asMaterialType())
+    val DECOMPRESSED = createSubGroup("decompressed", Material.GRINDSTONE.asMaterialType())
     val HIDDEN = createSubGroup("hidden", Material.BARRIER.asMaterialType())
 
     init {
@@ -44,6 +46,8 @@ object IEItemGroups {
             GENERATORS,
             MOB_SIMULATION,
             STORAGE,
+            COMPRESSED,
+            DECOMPRESSED,
         )
         MOB_SIMULATION.isCrossAddonItemGroup = true
         MAIN.register(InfinityExpansion2.instance)

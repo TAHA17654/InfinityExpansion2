@@ -44,6 +44,14 @@ items:
     conditions:
       force-load: true
     name: "&k.&bI&4E&a&l2&k. &a- &6Storage"
+  _IG_COMPRESSED:
+    conditions:
+      force-load: true
+    name: "&k.&bI&4E&a&l2&k. &a- &dCompressed"
+  _IG_DECOMPRESSED:
+    conditions:
+      force-load: true
+    name: "&k.&bI&4E&a&l2&k. &a- &5Decompressed"
   _IG_HIDDEN:
     conditions:
       force-load: true
@@ -81,6 +89,14 @@ items:
     lore:
       - "&7Infuses empty mob data card"
       - "&7with mob items."
+  _RECIPE_MACHINE_COMPRESSOR:
+    conditions:
+      force-load: true
+    name: "&dMachine Compressor"
+    lore:
+      - "&7Compress 64 machines into one."
+      - "&7Put the compressed machine into a"
+      - "&7Grind Stone to get the 64 machines back."
   _RECIPE_STORAGE_FORGE:
     conditions:
       force-load: true
@@ -1344,6 +1360,22 @@ items:
   MOB_DATA_CARD:
     name: "&8Mob Data Card"
 
+  # items - compressed
+  MACHINE_COMPRESSOR:
+    name: "&dMachine Compressor"
+    lore:
+      - ""
+      - "&7Compresses 64 machines into one"
+      - "&7compressed machine."
+      - ""
+      - "&8\u21E8 &e\u26A1 &7Speed: &b1x"
+  DECOMPRESSION_GUIDE:
+    name: "&5Decompression"
+    lore:
+      - ""
+      - "&7Put a compressed machine into a"
+      - "&7Grind Stone (in the dispenser) to"
+      - "&7get the 64 machines back."
   # items - storage
   STORAGE_FORGE:
     name: "&6Storage Forge"
@@ -1376,6 +1408,11 @@ items:
     name: "&6Oscillator"
 
 lores:
+  compressed:
+    name: "&d[x64] {0}"
+    info: "&dCompressed &7- works as &e{0} &7machines"
+    energy: "&7Energy consumption: &e{0}x"
+    buffer: "&7Output buffer: &e{0} &7per item"
   guide:
     back:
       previous: "&fClick&7: Go back to previous page"

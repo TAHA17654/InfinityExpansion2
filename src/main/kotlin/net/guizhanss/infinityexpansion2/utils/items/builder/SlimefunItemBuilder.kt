@@ -9,6 +9,9 @@ import net.guizhanss.guizhanlib.kt.slimefun.items.builder.ItemRegistry
 import net.guizhanss.guizhanlib.kt.slimefun.items.builder.MaterialType
 import net.guizhanss.guizhanlib.minecraft.utils.ChatUtil
 import net.guizhanss.infinityexpansion2.InfinityExpansion2
+import net.guizhanss.infinityexpansion2.core.CompressibleMachine
+import net.guizhanss.infinityexpansion2.core.IERegistry
+import net.guizhanss.infinityexpansion2.implementation.items.machines.compressed.CompressedMachines
 import org.bukkit.inventory.ItemStack
 import java.util.Locale
 import java.util.logging.Level
@@ -54,20 +57,11 @@ class SlimefunItemBuilder(private val registry: ItemRegistry) {
 
         // SlimefunItem
         val args = arrayOf(itemGroup, editItem(sfis), recipeType, recipe, *otherArgs)
-        // sf4k's reflection cant find the constructor, we use our own implementation
-        val constructor = clazz.constructors.firstOrNull { constructor ->
-            constructor.valueParameters.size == args.size && constructor.valueParameters.zip(args).all { (param, arg) ->
-                val classifier = param.type.classifier as? KClass<*> ?: return@all false
-                if (arg == null) param.type.isMarkedNullable
-                else classifier.isInstance(arg)
-            }
-        } ?: error("No constructor found for ${clazz.simpleName} with arguments: ${args.joinToString()}")
+        val item = createInstance(clazz, args)
 
-        val item = try {
-            constructor.call(*args)
-        } catch (e: Exception) {
-            InfinityExpansion2.log(Level.SEVERE, e, "Failed to create SlimefunItem")
-            throw e
+        // remember the machines that can be compressed
+        if (CompressedMachines.isCompressible(item)) {
+            IERegistry.compressibleMachines.add(CompressibleMachine(clazz, id, material, sfis, otherArgs.toList()))
         }
         item.register(InfinityExpansion2.instance)
         return sfis
@@ -83,4 +77,25 @@ inline fun <reified I : SlimefunItem> ItemRegistry.buildSlimefunItem(
     itemBuilder.apply(builder)
     val item = itemBuilder.build(I::class, *otherArgs)
     ReadOnlyProperty { _, _ -> item }
+}
+
+/**
+ * Creates the instance of a [SlimefunItem] with the given constructor [args], without registering it.
+ */
+internal fun <T : SlimefunItem> createInstance(clazz: KClass<out T>, args: Array<out Any?>): T {
+    // sf4k's reflection cant find the constructor, we use our own implementation
+    val constructor = clazz.constructors.firstOrNull { constructor ->
+        constructor.valueParameters.size == args.size && constructor.valueParameters.zip(args).all { (param, arg) ->
+            val classifier = param.type.classifier as? KClass<*> ?: return@all false
+            if (arg == null) param.type.isMarkedNullable
+            else classifier.isInstance(arg)
+        }
+    } ?: error("No constructor found for ${clazz.simpleName} with arguments: ${args.joinToString()}")
+
+    return try {
+        constructor.call(*args)
+    } catch (e: Exception) {
+        InfinityExpansion2.log(Level.SEVERE, e, "Failed to create SlimefunItem")
+        throw e
+    }
 }

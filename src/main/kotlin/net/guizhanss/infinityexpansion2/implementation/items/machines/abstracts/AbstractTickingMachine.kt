@@ -12,8 +12,10 @@ import net.guizhanss.guizhanlib.slimefun.machines.TickingMenuBlock
 import net.guizhanss.infinityexpansion2.core.items.attributes.CustomTickRateMachine
 import net.guizhanss.infinityexpansion2.core.items.attributes.EnergyTickingConsumer
 import net.guizhanss.infinityexpansion2.core.menu.MenuLayout
+import net.guizhanss.infinityexpansion2.implementation.items.machines.compressed.OutputBuffer
 import net.guizhanss.infinityexpansion2.utils.items.GuiItems
 import org.bukkit.block.Block
+import org.bukkit.event.block.BlockBreakEvent
 import org.bukkit.inventory.ItemStack
 
 /**
@@ -40,9 +42,25 @@ abstract class AbstractTickingMachine(
         addItemSetting(tickRateSetting, energyPerTickSetting)
     }
 
+    /**
+     * How many machines this machine stands for.
+     *
+     * Normal machines use 1. A compressed machine (made of 64 machines) uses 64: it consumes [multiplier] times the
+     * energy, runs [process] up to [multiplier] times per tick, and buffers up to [OutputBuffer.LIMIT] items of each
+     * output type. It must be set before the machine is registered.
+     */
+    var multiplier: Int = 1
+        internal set(value) {
+            require(value >= 1) { "multiplier must be positive" }
+            field = value
+        }
+
+    val isCompressed: Boolean get() = multiplier > 1
+
     override fun getCustomTickRate() = tickRateSetting.value
 
-    override fun getEnergyConsumptionPerTick() = energyPerTickSetting.value
+    override fun getEnergyConsumptionPerTick() =
+        (energyPerTickSetting.value.toLong() * multiplier).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
 
     override fun setup(preset: BlockMenuPreset) {
         layout.setupPreset(preset)
@@ -62,8 +80,58 @@ abstract class AbstractTickingMachine(
             menu.setStatus {
                 GuiItems.noPower(getEnergyConsumptionPerTick(), getCharge(menu.location), capacity)
             }
-        } else if (tickCount % getCustomTickRate() == 0 && process(b, menu)) {
-            removeCharge(menu.location, getEnergyConsumptionPerTick())
+        } else if (tickCount % getCustomTickRate() == 0) {
+            if (!isCompressed) {
+                if (process(b, menu)) {
+                    removeCharge(menu.location, getEnergyConsumptionPerTick())
+                }
+            } else {
+                val runs = processCompressed(b, menu)
+                if (runs > 0) {
+                    val energy = (energyPerTickSetting.value.toLong() * runs).coerceAtMost(Int.MAX_VALUE.toLong())
+                    removeCharge(menu.location, energy.toInt())
+                }
+            }
+        }
+    }
+
+    /**
+     * Runs [process] up to [multiplier] times, as if [multiplier] machines were running on the same tick.
+     * The output is moved into the [OutputBuffer] after each run, so the machine is only blocked when
+     * one of the output items reaches [OutputBuffer.LIMIT].
+     *
+     * Returns the amount of successful runs.
+     */
+    private fun processCompressed(b: Block, menu: BlockMenu): Int {
+        val buffer = OutputBuffer.of(menu)
+        buffer.absorb(menu, outputSlots)
+
+        var runs = 0
+        while (runs < multiplier) {
+            if (buffer.isFull()) {
+                menu.setStatus { GuiItems.NO_ROOM }
+                break
+            }
+            if (!process(b, menu)) break
+            runs++
+            buffer.absorb(menu, outputSlots)
+        }
+
+        buffer.refill(menu, outputSlots)
+        buffer.save()
+        if (!buffer.isEmpty() && menu.hasViewer() && outputSlots.isNotEmpty()) {
+            // show the buffered amount in the status slot
+            menu.replaceExistingItem(layout.statusSlot, buffer.createStatusItem())
+        }
+        return runs
+    }
+
+    override fun onBreak(e: BlockBreakEvent, menu: BlockMenu) {
+        super.onBreak(e, menu)
+        if (isCompressed) {
+            // the items in the buffer are not in the menu, drop them
+            val dropLocation = menu.location.clone().add(0.5, 0.5, 0.5)
+            OutputBuffer.remove(menu).forEach { menu.location.world.dropItem(dropLocation, it) }
         }
     }
 

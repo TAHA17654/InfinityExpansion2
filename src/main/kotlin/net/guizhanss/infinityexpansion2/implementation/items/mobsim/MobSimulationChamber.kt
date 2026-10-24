@@ -72,6 +72,9 @@ class MobSimulationChamber(
         }
     }
 
+    // the compressed chamber reads the cards from the input buffer, the slot cannot hold a stack of cards
+    override val stagesBufferedInput get() = false
+
     override fun isBufferedInput(item: ItemStack): Boolean {
         if (!item.isSlimefunItem<MobDataCard>()) return false
         val id = MobDataCard.getMobDataId(item) ?: return false
@@ -100,7 +103,7 @@ class MobSimulationChamber(
 
     override fun process(b: Block, menu: BlockMenu): Boolean {
         val l = b.location
-        val (props, cardAmount) = menu.getDataCard(layout) ?: run {
+        val (props, cardAmount) = (if (isCompressed) menu.getBufferedDataCard() else menu.getDataCard(layout)) ?: run {
             menu.setStatus { GuiItems.INVALID_INPUT }
             menu.setEnergyConsumption(0)
             return false
@@ -266,6 +269,18 @@ class MobSimulationChamber(
             val props = IERegistry.mobDataCards[id] ?: return null
 
             return props to input.amount
+        }
+
+        /**
+         * Get the data card from the input buffer of a compressed chamber.
+         * Returns the [MobDataCardProps] and the amount of the cards.
+         */
+        private fun BlockMenu.getBufferedDataCard(): Pair<MobDataCardProps, Int>? {
+            val (card, amount) = OutputBuffer.inputOf(this).first() ?: return null
+            val id = MobDataCard.getMobDataId(card) ?: return null
+            val props = IERegistry.mobDataCards[id] ?: return null
+
+            return props to amount
         }
 
         @Suppress("unused")

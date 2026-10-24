@@ -107,18 +107,16 @@ class OutputBuffer private constructor(private val location: Location, private v
     }
 
     /**
-     * Fills the given [slots] with the items from the buffer. By default the slots only get normal stacks
-     * (never more than the max stack size of the item), because bigger stacks break the menu on the client.
-     *
-     * With [oversize], a slot gets up to [LIMIT] items. This is only meant to temporarily put the buffered inputs
-     * into the slots while the machine is running, they must be absorbed again before the tick ends.
+     * Fills the given [slots] with the items from the buffer. The slots only get normal stacks
+     * (never more than the max stack size of the item), because bigger stacks cannot be saved and break
+     * the menu on the client.
      */
     @Synchronized
-    fun refill(menu: BlockMenu, slots: IntArray, oversize: Boolean = false) {
+    fun refill(menu: BlockMenu, slots: IntArray) {
         val iterator = entries.iterator()
         while (iterator.hasNext()) {
             val entry = iterator.next()
-            val maxStack = if (oversize) LIMIT else entry.template.maxStackSize
+            val maxStack = entry.template.maxStackSize
 
             for (slot in slots) {
                 if (entry.amount <= 0) break
@@ -174,6 +172,12 @@ class OutputBuffer private constructor(private val location: Location, private v
         save()
         return result
     }
+
+    /**
+     * The first item type in the buffer (as a single item) and its amount, or `null` if the buffer is empty.
+     */
+    @Synchronized
+    fun first(): Pair<ItemStack, Int>? = entries.firstOrNull()?.let { it.template.clone() to it.amount }
 
     /**
      * The lore lines that describe the content of this buffer.

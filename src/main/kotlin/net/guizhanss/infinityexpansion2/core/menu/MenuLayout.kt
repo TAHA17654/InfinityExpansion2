@@ -53,6 +53,16 @@ data class MenuLayout(
 
     companion object {
 
+        /**
+         * The layout used by compressed machines. They get as many output slots as possible, because network
+         * transporters (like grabbers) can only take the items that are in the slots.
+         */
+        fun compressed(layout: MenuLayout): MenuLayout = when (layout) {
+            OUTPUT_ONLY_ONE_ROW -> OUTPUT_ONLY
+            HOPPER -> COMPRESSED_HOPPER
+            else -> layout
+        }
+
         // one row, no input
         val OUTPUT_ONLY_ONE_ROW = MenuLayout(
             outputBorder = intArrayOf(1, 8),
@@ -98,6 +108,19 @@ data class MenuLayout(
             inputSlots = intArrayOf(1, 2, 3, 4, 5, 6, 7),
             outputBorder = intArrayOf(27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 44),
             outputSlots = intArrayOf(37, 38, 39, 40, 41, 42, 43),
+            statusSlot = 22,
+        )
+
+        // 7 input slots, 27 output slots
+        val COMPRESSED_HOPPER = MenuLayout(
+            background = intArrayOf(18, 19, 20, 21, 23, 24, 25, 26),
+            inputBorder = intArrayOf(0, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17),
+            inputSlots = intArrayOf(1, 2, 3, 4, 5, 6, 7),
+            outputSlots = intArrayOf(
+                27, 28, 29, 30, 31, 32, 33, 34, 35,
+                36, 37, 38, 39, 40, 41, 42, 43, 44,
+                45, 46, 47, 48, 49, 50, 51, 52, 53,
+            ),
             statusSlot = 22,
         )
 

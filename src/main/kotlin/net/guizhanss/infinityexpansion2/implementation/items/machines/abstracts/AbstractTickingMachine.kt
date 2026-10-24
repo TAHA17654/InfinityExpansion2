@@ -26,11 +26,19 @@ abstract class AbstractTickingMachine(
     itemStack: SlimefunItemStack,
     recipeType: RecipeType,
     recipe: Array<out ItemStack?>,
-    protected val layout: MenuLayout,
+    baseLayout: MenuLayout,
     energyPerTick: Int,
     tickRate: Int = 1,
 ) : TickingMenuBlock(itemGroup, itemStack, recipeType, recipe), EnergyNetComponent, EnergyTickingConsumer,
     CustomTickRateMachine {
+
+    /**
+     * The menu layout. Compressed machines get a bigger one, see [MenuLayout.compressed].
+     */
+    protected val layout: MenuLayout
+        get() = if (isCompressed) MenuLayout.compressed(baseLayout) else baseLayout
+
+    private val baseLayout: MenuLayout = baseLayout
 
     // should avoid accessing this directly, use getCustomTickRate() instead
     protected val tickRateSetting = IntRangeSetting(this, "tick-rate", 1, tickRate, 3600)
@@ -102,13 +110,21 @@ abstract class AbstractTickingMachine(
     protected open fun isBufferedInput(item: ItemStack) = false
 
     /**
+     * Whether the buffered inputs are put back into the input slots before each run.
+     * Machines that read the input buffer directly (instead of the slots) should return `false`.
+     */
+    protected open val stagesBufferedInput: Boolean get() = true
+
+    /**
      * Runs [process] up to [multiplier] times, as if [multiplier] machines were running on the same tick.
      *
      * - The output is moved into the output buffer after each run, so the machine is only blocked when
      *   one of the output items reaches [OutputBuffer.LIMIT]. At the end the output slots are filled with
-     *   up to [OutputBuffer.LIMIT] items each.
+     *   normal stacks from the buffer.
      * - The input slots are emptied into the input buffer after the runs, so network pushers (which only put
-     *   one normal stack into a slot) can keep pushing. Before the runs, the buffer is put back to the slots.
+     *   one normal stack into a slot) can keep pushing. Before each run, the slots are topped up from the buffer.
+     *
+     * The slots never hold more than a normal stack.
      *
      * Returns the amount of successful runs.
      */
@@ -119,8 +135,7 @@ abstract class AbstractTickingMachine(
 
         output.absorb(menu, outputSlots)
         if (bufferInput) {
-            input.absorb(menu, inputSlots, { isBufferedInput(it) })
-            input.refill(menu, inputSlots, oversize = true)
+            input.absorb(menu, inputSlots) { isBufferedInput(it) }
         }
 
         var runs = 0
@@ -129,13 +144,16 @@ abstract class AbstractTickingMachine(
                 menu.setStatus { GuiItems.NO_ROOM }
                 break
             }
+            if (bufferInput && stagesBufferedInput) {
+                input.refill(menu, inputSlots)
+            }
             if (!process(b, menu)) break
             runs++
             output.absorb(menu, outputSlots)
         }
 
         if (bufferInput) {
-            input.absorb(menu, inputSlots, { isBufferedInput(it) })
+            input.absorb(menu, inputSlots) { isBufferedInput(it) }
             input.save()
         }
         output.refill(menu, outputSlots)

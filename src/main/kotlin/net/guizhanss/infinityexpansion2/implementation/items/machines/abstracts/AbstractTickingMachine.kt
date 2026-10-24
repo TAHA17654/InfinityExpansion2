@@ -94,7 +94,14 @@ abstract class AbstractTickingMachine(
                     removeCharge(menu.location, getEnergyConsumptionPerTick())
                 }
             } else {
-                val runs = processCompressed(b, menu)
+                // skip this tick if a network grabber is taking items out of the buffers right now
+                val lock = OutputBuffer.lockOf(menu)
+                if (!lock.tryLock()) return
+                val runs = try {
+                    processCompressed(b, menu)
+                } finally {
+                    lock.unlock()
+                }
                 if (runs > 0) {
                     val energy = (energyPerTickSetting.value.toLong() * runs).coerceAtMost(Int.MAX_VALUE.toLong())
                     removeCharge(menu.location, energy.toInt())

@@ -18,6 +18,7 @@ import java.text.NumberFormat
 import java.util.Base64
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.locks.ReentrantLock
 
 /**
  * A virtual output buffer used by compressed machines.
@@ -143,6 +144,43 @@ class OutputBuffer private constructor(private val location: Location, private v
     }
 
     /**
+     * Like [refill], but a slot can get up to [LIMIT] items.
+     *
+     * This must only be used for a very short time, while a network grabber takes the items out of the machine
+     * (see [net.guizhanss.infinityexpansion2.api.CompressedBufferApi]), and the slots must be absorbed again right
+     * after that. Stacks bigger than a normal stack can neither be saved nor displayed correctly.
+     */
+    @Synchronized
+    fun refillOversize(menu: BlockMenu, slots: IntArray) {
+        val iterator = entries.iterator()
+        while (iterator.hasNext()) {
+            val entry = iterator.next()
+
+            for (slot in slots) {
+                if (entry.amount <= 0) break
+
+                val current = menu.getItemInSlot(slot)
+                if (current.isAir()) {
+                    val give = minOf(LIMIT, entry.amount)
+                    menu.replaceExistingItem(slot, entry.template.clone().apply { amount = give })
+                    entry.amount -= give
+                    dirty = true
+                } else if (matches(entry.template, current!!) && current.amount < LIMIT) {
+                    val give = minOf(LIMIT - current.amount, entry.amount)
+                    menu.replaceExistingItem(slot, current.clone().apply { amount = current.amount + give })
+                    entry.amount -= give
+                    dirty = true
+                }
+            }
+
+            if (entry.amount <= 0) {
+                iterator.remove()
+                dirty = true
+            }
+        }
+    }
+
+    /**
      * Writes the buffer into the block data, if it has changed.
      */
     @Synchronized
@@ -217,8 +255,15 @@ class OutputBuffer private constructor(private val location: Location, private v
         private const val FIELD_SEPARATOR = ":"
         private val NUMBER_FORMAT = NumberFormat.getNumberInstance(Locale.US)
 
+        private val locks = ConcurrentHashMap<BlockPosition, ReentrantLock>()
         private val outputBuffers = ConcurrentHashMap<BlockPosition, OutputBuffer>()
         private val inputBuffers = ConcurrentHashMap<BlockPosition, OutputBuffer>()
+
+        /**
+         * The lock of the machine at the given [menu]. It is held while the machine is running, and while a network
+         * grabber is taking items from it, so these two never work on the buffers at the same time.
+         */
+        fun lockOf(menu: BlockMenu): ReentrantLock = locks.computeIfAbsent(menu.position) { ReentrantLock() }
 
         /**
          * Gets (or loads) the output buffer of the machine at the given [menu].
@@ -239,6 +284,7 @@ class OutputBuffer private constructor(private val location: Location, private v
          * Forgets the buffers of the machine at the given [menu] and returns the items inside them.
          */
         fun remove(menu: BlockMenu): List<ItemStack> {
+            locks.remove(menu.position)
             val output = outputBuffers.remove(menu.position) ?: OutputBuffer(menu.location, BS_OUTPUT)
             val input = inputBuffers.remove(menu.position) ?: OutputBuffer(menu.location, BS_INPUT)
             return output.drain() + input.drain()

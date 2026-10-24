@@ -1,0 +1,8 @@
+# Maximum machines per block (1-64)
+max-stack: 64
+
+# Run the extra machine ticks every N server ticks (Slimefun default tick rate is 2)
+tick-interval: 2
+
+# Slimefun item IDs that can NOT be stacked
+blacklist: []

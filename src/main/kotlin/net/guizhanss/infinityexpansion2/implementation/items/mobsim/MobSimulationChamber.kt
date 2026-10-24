@@ -72,6 +72,12 @@ class MobSimulationChamber(
         }
     }
 
+    override fun isBufferedInput(item: ItemStack): Boolean {
+        if (!item.isSlimefunItem<MobDataCard>()) return false
+        val id = MobDataCard.getMobDataId(item) ?: return false
+        return IERegistry.mobDataCards.containsKey(id)
+    }
+
     override fun getCapacity() =
         (energyCapacitySetting.value.toLong() * multiplier).coerceAtMost(2_000_000_000L).toInt()
 
@@ -100,9 +106,10 @@ class MobSimulationChamber(
             return false
         }
 
-        // handle stackable, a compressed chamber always works with stacked cards, and it counts as [multiplier] chambers
+        // handle stackable, a compressed chamber always works with stacked cards: N cards work as N cards
+        // (the cards are kept in the input buffer, up to 4096, because the data cards cannot be stacked normally)
         val amount = if (isCompressed) {
-            (cardAmount.toLong() * multiplier).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+            cardAmount
         } else if (InfinityExpansion2.configService.mobSimAllowStackedCard.value) {
             cardAmount
         } else {
@@ -115,7 +122,8 @@ class MobSimulationChamber(
         }
 
         // Energy consumption is non-negative here; only the upper bound needs clamping.
-        val energy = (getEnergyConsumptionPerTick().toLong() + props.energy.toLong() * amount)
+        val baseEnergy = if (isCompressed) energyPerTickSetting.value else getEnergyConsumptionPerTick()
+        val energy = (baseEnergy.toLong() + props.energy.toLong() * amount)
             .coerceAtMost(Int.MAX_VALUE.toLong())
             .toInt()
 
@@ -131,8 +139,9 @@ class MobSimulationChamber(
         menu.replaceExistingItem(XP_SLOT, GuiItems.experience(currentXp))
 
         if (tickCount % (InfinityExpansion2.configService.mobSimInterval.value * getCustomTickRate()) == 0) {
+            val xpTimes = if (isCompressed) amount else 1
             val xp = floor(
-                props.experience * InfinityExpansion2.configService.mobSimExpMultiplier.value * multiplier
+                props.experience * InfinityExpansion2.configService.mobSimExpMultiplier.value * xpTimes
             ).toInt()
 
             if (isCompressed) {

@@ -14,6 +14,7 @@ import net.guizhanss.infinityexpansion2.implementation.items.machines.Quarry
 import net.guizhanss.infinityexpansion2.implementation.items.machines.VoidHarvester
 import net.guizhanss.infinityexpansion2.implementation.items.machines.abstracts.AbstractTickingMachine
 import net.guizhanss.infinityexpansion2.implementation.items.machines.abstracts.HopperMachine
+import net.guizhanss.infinityexpansion2.implementation.items.mobsim.MobSimulationChamber
 import net.guizhanss.infinityexpansion2.implementation.items.machines.abstracts.MaterialGenerator
 import net.guizhanss.infinityexpansion2.implementation.recipes.IERecipeTypes
 import net.guizhanss.infinityexpansion2.utils.items.builder.createInstance
@@ -42,7 +43,7 @@ object CompressedMachines {
      */
     fun isCompressible(item: SlimefunItem) = item is AbstractTickingMachine &&
         item !is MachineCompressor &&
-        (item is MaterialGenerator || item is Quarry || item is VoidHarvester ||
+        (item is MaterialGenerator || item is Quarry || item is VoidHarvester || item is MobSimulationChamber ||
             item is GrowingMachine || item is HopperMachine)
 
     /**

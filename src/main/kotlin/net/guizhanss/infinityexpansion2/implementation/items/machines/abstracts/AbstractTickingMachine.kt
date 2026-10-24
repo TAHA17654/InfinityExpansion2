@@ -96,32 +96,54 @@ abstract class AbstractTickingMachine(
     }
 
     /**
+     * Whether the item in an input slot should be moved into the input buffer of a compressed machine.
+     * Only the machines that consume their input should return `true` for the items they use.
+     */
+    protected open fun isBufferedInput(item: ItemStack) = false
+
+    /**
      * Runs [process] up to [multiplier] times, as if [multiplier] machines were running on the same tick.
-     * The output is moved into the [OutputBuffer] after each run, so the machine is only blocked when
-     * one of the output items reaches [OutputBuffer.LIMIT].
+     *
+     * - The output is moved into the output buffer after each run, so the machine is only blocked when
+     *   one of the output items reaches [OutputBuffer.LIMIT]. At the end the output slots are filled with
+     *   up to [OutputBuffer.LIMIT] items each.
+     * - The input slots are emptied into the input buffer after the runs, so network pushers (which only put
+     *   one normal stack into a slot) can keep pushing. Before the runs, the buffer is put back to the slots.
      *
      * Returns the amount of successful runs.
      */
     private fun processCompressed(b: Block, menu: BlockMenu): Int {
-        val buffer = OutputBuffer.of(menu)
-        buffer.absorb(menu, outputSlots)
+        val output = OutputBuffer.of(menu)
+        val input = OutputBuffer.inputOf(menu)
+        val bufferInput = inputSlots.isNotEmpty()
+
+        output.absorb(menu, outputSlots)
+        if (bufferInput) {
+            input.absorb(menu, inputSlots, { isBufferedInput(it) })
+            input.refill(menu, inputSlots)
+        }
 
         var runs = 0
         while (runs < multiplier) {
-            if (buffer.isFull()) {
+            if (output.isFull()) {
                 menu.setStatus { GuiItems.NO_ROOM }
                 break
             }
             if (!process(b, menu)) break
             runs++
-            buffer.absorb(menu, outputSlots)
+            output.absorb(menu, outputSlots)
         }
 
-        buffer.refill(menu, outputSlots)
-        buffer.save()
-        if (!buffer.isEmpty() && menu.hasViewer() && outputSlots.isNotEmpty()) {
-            // show the buffered amount in the status slot
-            menu.replaceExistingItem(layout.statusSlot, buffer.createStatusItem())
+        if (bufferInput) {
+            input.absorb(menu, inputSlots, { isBufferedInput(it) })
+            input.save()
+        }
+        output.refill(menu, outputSlots)
+        output.save()
+
+        if ((!output.isEmpty() || !input.isEmpty()) && menu.hasViewer()) {
+            // show the buffered amounts in the status slot
+            menu.replaceExistingItem(layout.statusSlot, OutputBuffer.createStatusItem(menu))
         }
         return runs
     }

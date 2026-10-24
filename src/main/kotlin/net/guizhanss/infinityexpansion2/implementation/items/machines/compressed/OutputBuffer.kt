@@ -27,7 +27,7 @@ import java.util.concurrent.ConcurrentHashMap
  * normal stacks in the output slots. The output slots are refilled from the buffer every tick, so hoppers, cargo
  * and players still interact with ordinary item stacks.
  */
-class OutputBuffer private constructor(private val location: Location) {
+class OutputBuffer private constructor(private val location: Location, private val key: String) {
 
     private class Entry(val template: ItemStack, val serialized: String, var amount: Int)
 
@@ -48,13 +48,13 @@ class OutputBuffer private constructor(private val location: Location) {
     fun isFull() = entries.any { it.amount >= LIMIT }
 
     /**
-     * Moves the items in the given output [slots] into the buffer.
+     * Moves the items in the given [slots] into the buffer. Only the items accepted by [accept] are moved.
      */
     @Synchronized
-    fun absorb(menu: BlockMenu, slots: IntArray) {
+    fun absorb(menu: BlockMenu, slots: IntArray, accept: (ItemStack) -> Boolean = { true }) {
         for (slot in slots) {
             val item = menu.getItemInSlot(slot)
-            if (item.isAir()) continue
+            if (item.isAir() || !accept(item!!)) continue
 
             var entry = entries.firstOrNull { matches(it.template, item!!) }
             if (entry == null) {
@@ -78,26 +78,55 @@ class OutputBuffer private constructor(private val location: Location) {
     }
 
     /**
-     * Fills the given output [slots] with (at most) normal stacks from the buffer.
+     * Adds [count] items of [template] directly into the buffer, without going through any slot.
+     * At most [maxTypes] different item types are kept.
+     *
+     * Returns the amount of items that were actually added.
+     */
+    @Synchronized
+    fun add(template: ItemStack, count: Int, maxTypes: Int): Int {
+        if (count <= 0 || template.isAir()) return 0
+
+        var entry = entries.firstOrNull { matches(it.template, template) }
+        if (entry == null) {
+            if (entries.size >= maxTypes) return 0
+            val single = template.clone().apply { amount = 1 }
+            entry = Entry(single, serialize(single), 0)
+            entries.add(entry)
+        }
+
+        val moved = minOf(count, LIMIT - entry.amount)
+        if (moved <= 0) {
+            if (entry.amount <= 0) entries.remove(entry)
+            return 0
+        }
+
+        entry.amount += moved
+        dirty = true
+        return moved
+    }
+
+    /**
+     * Fills the given [slots] with the items from the buffer. A slot can hold up to [LIMIT] items,
+     * so network grabbers can take a lot of items at once.
      */
     @Synchronized
     fun refill(menu: BlockMenu, slots: IntArray) {
         val iterator = entries.iterator()
         while (iterator.hasNext()) {
             val entry = iterator.next()
-            val maxStack = entry.template.maxStackSize
 
             for (slot in slots) {
                 if (entry.amount <= 0) break
 
                 val current = menu.getItemInSlot(slot)
                 if (current.isAir()) {
-                    val give = minOf(maxStack, entry.amount)
+                    val give = minOf(LIMIT, entry.amount)
                     menu.replaceExistingItem(slot, entry.template.clone().apply { amount = give })
                     entry.amount -= give
                     dirty = true
-                } else if (matches(entry.template, current!!) && current.amount < maxStack) {
-                    val give = minOf(maxStack - current.amount, entry.amount)
+                } else if (matches(entry.template, current!!) && current.amount < LIMIT) {
+                    val give = minOf(LIMIT - current.amount, entry.amount)
                     menu.replaceExistingItem(slot, current.clone().apply { amount = current.amount + give })
                     entry.amount -= give
                     dirty = true
@@ -118,7 +147,7 @@ class OutputBuffer private constructor(private val location: Location) {
     fun save() {
         if (!dirty) return
         dirty = false
-        location.setString(BS_BUFFER, entries.joinToString(ENTRY_SEPARATOR) { "${it.amount}$FIELD_SEPARATOR${it.serialized}" })
+        location.setString(key, entries.joinToString(ENTRY_SEPARATOR) { "${it.amount}$FIELD_SEPARATOR${it.serialized}" })
     }
 
     /**
@@ -143,24 +172,17 @@ class OutputBuffer private constructor(private val location: Location) {
     }
 
     /**
-     * Creates the item that shows what is currently stored in the buffer.
+     * The lore lines that describe the content of this buffer.
      */
     @Synchronized
-    fun createStatusItem(): ItemStack {
-        val item = ItemStack(Material.BARREL)
-        val meta = item.itemMeta ?: return item
-        meta.setDisplayName(ChatUtil.color("&bBuffered output"))
-        meta.lore = entries.map {
-            ChatUtil.color(
-                "&7${ItemUtils.getItemName(it.template)}&8: &e${NUMBER_FORMAT.format(it.amount)} &7/ &e${NUMBER_FORMAT.format(LIMIT)}"
-            )
-        }
-        item.itemMeta = meta
-        return item
+    fun lines(): List<String> = entries.map {
+        ChatUtil.color(
+            "&7${ItemUtils.getItemName(it.template)}&8: &e${NUMBER_FORMAT.format(it.amount)} &7/ &e${NUMBER_FORMAT.format(LIMIT)}"
+        )
     }
 
     private fun load() {
-        val raw = location.getString(BS_BUFFER)
+        val raw = location.getString(key)
         if (raw.isNullOrEmpty()) return
 
         for (part in raw.split(ENTRY_SEPARATOR)) {
@@ -181,25 +203,60 @@ class OutputBuffer private constructor(private val location: Location) {
          */
         const val LIMIT = 4096
 
-        private const val BS_BUFFER = "output_buffer"
+        private const val BS_OUTPUT = "output_buffer"
+        private const val BS_INPUT = "input_buffer"
         private const val ENTRY_SEPARATOR = ";"
         private const val FIELD_SEPARATOR = ":"
         private val NUMBER_FORMAT = NumberFormat.getNumberInstance(Locale.US)
 
-        private val buffers = ConcurrentHashMap<BlockPosition, OutputBuffer>()
+        private val outputBuffers = ConcurrentHashMap<BlockPosition, OutputBuffer>()
+        private val inputBuffers = ConcurrentHashMap<BlockPosition, OutputBuffer>()
 
         /**
-         * Gets (or loads) the buffer of the machine at the given [menu].
+         * Gets (or loads) the output buffer of the machine at the given [menu].
          */
         fun of(menu: BlockMenu): OutputBuffer =
-            buffers.computeIfAbsent(menu.position) { OutputBuffer(menu.location) }
+            outputBuffers.computeIfAbsent(menu.position) { OutputBuffer(menu.location, BS_OUTPUT) }
 
         /**
-         * Forgets the buffer of the machine at the given [menu] and returns the items inside it.
+         * Gets (or loads) the input buffer of the machine at the given [menu].
+         *
+         * Network pushers can only put one normal stack into each input slot, so the input slots are emptied
+         * into this buffer every tick, which leaves room for the next push.
+         */
+        fun inputOf(menu: BlockMenu): OutputBuffer =
+            inputBuffers.computeIfAbsent(menu.position) { OutputBuffer(menu.location, BS_INPUT) }
+
+        /**
+         * Forgets the buffers of the machine at the given [menu] and returns the items inside them.
          */
         fun remove(menu: BlockMenu): List<ItemStack> {
-            val buffer = buffers.remove(menu.position) ?: OutputBuffer(menu.location)
-            return buffer.drain()
+            val output = outputBuffers.remove(menu.position) ?: OutputBuffer(menu.location, BS_OUTPUT)
+            val input = inputBuffers.remove(menu.position) ?: OutputBuffer(menu.location, BS_INPUT)
+            return output.drain() + input.drain()
+        }
+
+        /**
+         * Creates the item that shows what is currently stored in the buffers of the machine at the given [menu].
+         */
+        fun createStatusItem(menu: BlockMenu): ItemStack {
+            val item = ItemStack(Material.BARREL)
+            val meta = item.itemMeta ?: return item
+            meta.setDisplayName(ChatUtil.color("&bBuffered items"))
+            val lore = mutableListOf<String>()
+            val input = inputOf(menu).lines()
+            val output = of(menu).lines()
+            if (input.isNotEmpty()) {
+                lore.add(ChatUtil.color("&aInput:"))
+                lore.addAll(input)
+            }
+            if (output.isNotEmpty()) {
+                lore.add(ChatUtil.color("&6Output:"))
+                lore.addAll(output)
+            }
+            meta.lore = lore
+            item.itemMeta = meta
+            return item
         }
 
         private fun matches(template: ItemStack, item: ItemStack) =

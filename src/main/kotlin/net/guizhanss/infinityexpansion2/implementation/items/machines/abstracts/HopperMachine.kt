@@ -69,6 +69,9 @@ open class HopperMachine(
         return false
     }
 
+    override fun isBufferedInput(item: ItemStack) =
+        recipes.keys.any { SlimefunUtils.isItemSimilar(item, it, false, false) }
+
     override fun getDefaultDisplayRecipes() = _recipes.flatMap { it.toPair().toDisplayRecipe() }
 
     override fun getInfoItems() = listOf(

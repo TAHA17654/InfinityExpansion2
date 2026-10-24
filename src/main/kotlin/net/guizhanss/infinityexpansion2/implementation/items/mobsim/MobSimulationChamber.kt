@@ -23,6 +23,7 @@ import net.guizhanss.infinityexpansion2.core.items.attributes.EnergyTickingConsu
 import net.guizhanss.infinityexpansion2.core.items.attributes.InformationalRecipeDisplayItem
 import net.guizhanss.infinityexpansion2.core.menu.MenuLayout
 import net.guizhanss.infinityexpansion2.implementation.items.machines.abstracts.AbstractTickingMachine
+import net.guizhanss.infinityexpansion2.implementation.items.machines.compressed.OutputBuffer
 import net.guizhanss.infinityexpansion2.utils.items.GuiItems
 import org.bukkit.Sound
 import org.bukkit.block.Block
@@ -71,7 +72,8 @@ class MobSimulationChamber(
         }
     }
 
-    override fun getCapacity() = energyCapacitySetting.value
+    override fun getCapacity() =
+        (energyCapacitySetting.value.toLong() * multiplier).coerceAtMost(2_000_000_000L).toInt()
 
     override fun onNewInstance(menu: BlockMenu, b: Block) {
         val l = b.location
@@ -98,8 +100,14 @@ class MobSimulationChamber(
             return false
         }
 
-        // handle stackable
-        val amount = if (InfinityExpansion2.configService.mobSimAllowStackedCard.value) cardAmount else 1
+        // handle stackable, a compressed chamber always works with stacked cards, and it counts as [multiplier] chambers
+        val amount = if (isCompressed) {
+            (cardAmount.toLong() * multiplier).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+        } else if (InfinityExpansion2.configService.mobSimAllowStackedCard.value) {
+            cardAmount
+        } else {
+            1
+        }
         if (props.energy < 0 || amount <= 0) {
             menu.setStatus { GuiItems.NO_POWER }
             menu.setEnergyConsumption(0)
@@ -123,9 +131,29 @@ class MobSimulationChamber(
         menu.replaceExistingItem(XP_SLOT, GuiItems.experience(currentXp))
 
         if (tickCount % (InfinityExpansion2.configService.mobSimInterval.value * getCustomTickRate()) == 0) {
-            val xp = floor(props.experience * InfinityExpansion2.configService.mobSimExpMultiplier.value).toInt()
+            val xp = floor(
+                props.experience * InfinityExpansion2.configService.mobSimExpMultiplier.value * multiplier
+            ).toInt()
 
-            if (InfinityExpansion2.configService.mobSimLegacyOutput.value) {
+            if (isCompressed) {
+                // the drops go into the output buffer, which holds up to 4096 of each item
+                val buffer = OutputBuffer.of(menu)
+                val selected = if (InfinityExpansion2.configService.mobSimLegacyOutput.value) {
+                    listOf(props.getRandomDrop() to 1.0)
+                } else {
+                    props.drops.filter { Random.nextDouble() <= it.second }
+                }
+
+                var added = 0
+                selected.forEach { (item, _) ->
+                    val total = (item.amount.toLong() * amount).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+                    added += buffer.add(item, total, outputSlots.size)
+                }
+                if (selected.isNotEmpty() && added <= 0) {
+                    menu.setStatus { GuiItems.NO_ROOM }
+                    return false
+                }
+            } else if (InfinityExpansion2.configService.mobSimLegacyOutput.value) {
                 val output = props.getRandomDrop()
                 if (!menu.fits(output, *outputSlots)) {
                     menu.setStatus { GuiItems.NO_ROOM }

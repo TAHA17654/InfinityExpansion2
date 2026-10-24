@@ -1,4 +1,4 @@
-name: Decompile Networks
+name: Build Networks Patch
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 jobs:
-  decompile:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -18,22 +18,33 @@ jobs:
         with:
           java-version: 21
           distribution: temurin
-      - name: Download Vineflower
-        run: curl -sSL -o vineflower.jar https://repo1.maven.org/maven2/org/vineflower/vineflower/1.10.1/vineflower-1.10.1.jar
-      - name: Decompile
+      - uses: gradle/actions/setup-gradle@v5
+        with:
+          gradle-version: "8.14.3"
+      - name: Compile patched classes
+        id: compile
+        continue-on-error: true
+        run: gradle compileJava --console=plain > build.log 2>&1
+      - name: Overlay classes onto the original jar
+        if: steps.compile.outcome == 'success'
         run: |
-          mkdir out
-          java -jar vineflower.jar -dgs=1 -asc=1 networks-original.jar out > decompile.log 2>&1 || true
+          cp networks-original.jar networks-patched.jar
+          cd build/classes/java/main
+          jar uf ../../../../networks-patched.jar .
+          cd ../../../..
+          unzip -l networks-patched.jar | grep -E "CompressedBridge|LineOperationUtil|SmartGrabber" >> build.log
+      - name: Publish log and jar
+        run: |
           mkdir /tmp/pub
-          cp -r out /tmp/pub/src
-          cp decompile.log /tmp/pub/
-          ls out | head
-      - name: Publish decompiled sources
-        run: |
+          cp build.log /tmp/pub/build.log
+          cp networks-patched.jar /tmp/pub/ 2>/dev/null || true
           cd /tmp/pub
-          git init -q -b networks-decompiled
+          git init -q -b networks-output
           git config user.name "build-bot"
           git config user.email "build-bot@users.noreply.github.com"
           git add -A
-          git commit -q -m "decompiled"
-          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" networks-decompiled
+          git commit -q -m "networks patch output for ${GITHUB_SHA}"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" networks-output
+      - name: Fail if compile failed
+        if: steps.compile.outcome == 'failure'
+        run: exit 1

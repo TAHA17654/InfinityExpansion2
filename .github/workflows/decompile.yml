@@ -1,0 +1,39 @@
+name: Decompile Networks
+
+on:
+  push:
+    branches:
+      - networks-work
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  decompile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          java-version: 21
+          distribution: temurin
+      - name: Download Vineflower
+        run: curl -sSL -o vineflower.jar https://repo1.maven.org/maven2/org/vineflower/vineflower/1.10.1/vineflower-1.10.1.jar
+      - name: Decompile
+        run: |
+          mkdir out
+          java -jar vineflower.jar -dgs=1 -asc=1 networks-original.jar out > decompile.log 2>&1 || true
+          mkdir /tmp/pub
+          cp -r out /tmp/pub/src
+          cp decompile.log /tmp/pub/
+          ls out | head
+      - name: Publish decompiled sources
+        run: |
+          cd /tmp/pub
+          git init -q -b networks-decompiled
+          git config user.name "build-bot"
+          git config user.email "build-bot@users.noreply.github.com"
+          git add -A
+          git commit -q -m "decompiled"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" networks-decompiled

@@ -16,7 +16,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.function.Consumer;
-import lombok.Generated;
 import me.mrCookieSlime.Slimefun.api.inventory.BlockMenu;
 import me.mrCookieSlime.Slimefun.api.item_transport.ItemTransportFlow;
 import org.bukkit.Location;
@@ -444,6 +443,7 @@ public final class LineOperationUtil {
       int[] slots = blockMenu.getPreset().getSlotsAccessedByItemTransport(blockMenu, ItemTransportFlow.INSERT, template);
       switch (transportMode) {
          case NONE:
+         {
             int freeSpace = 0;
             int[] openBuf = new int[slots.length];
             int openCount = 0;
@@ -472,7 +472,9 @@ public final class LineOperationUtil {
                BlockMenuUtil.pushItem(blockMenu, retrievedx, openCount == slots.length ? slots : Arrays.copyOf(openBuf, openCount));
             }
             break;
+         }
          case NONNULL_ONLY:
+         {
             int free = limitQuantity;
 
             for (int slotxxxxx : slots) {
@@ -497,7 +499,9 @@ public final class LineOperationUtil {
                }
             }
             break;
+         }
          case NULL_ONLY:
+         {
             int free = limitQuantity;
 
             for (int slotxxxxxx : slots) {
@@ -516,7 +520,9 @@ public final class LineOperationUtil {
                }
             }
             break;
+         }
          case P2P:
+         {
             if (itemIndex >= slots.length) {
                return;
             }
@@ -524,7 +530,9 @@ public final class LineOperationUtil {
             int slotx = slots[itemIndex];
             pushSlot(accessor, root, itemRequest, blockMenu, template, slotx, limitQuantity);
             break;
+         }
          case P2P_SPECIFIED_QUANTITY:
+         {
             if (itemIndex >= slots.length) {
                return;
             }
@@ -548,19 +556,25 @@ public final class LineOperationUtil {
                BlockMenuUtil.pushItem(blockMenu, retrieved, slot);
             }
             break;
+         }
          case FIRST_ONLY:
+         {
             if (slots.length != 0) {
                int slotx = slots[0];
                pushSlot(accessor, root, itemRequest, blockMenu, template, slotx, limitQuantity);
             }
             break;
+         }
          case LAST_ONLY:
+         {
             if (slots.length != 0) {
                int slotx = slots[slots.length - 1];
                pushSlot(accessor, root, itemRequest, blockMenu, template, slotx, limitQuantity);
             }
             break;
+         }
          case FIRST_STOP:
+         {
             int freeSpace = 0;
 
             for (int slotxx : slots) {
@@ -591,7 +605,9 @@ public final class LineOperationUtil {
                BlockMenuUtil.pushItem(blockMenu, retrievedx, slots);
             }
             break;
+         }
          case LAZY:
+         {
             if (slots.length > 0) {
                ItemStack delta = blockMenu.getItemInSlot(slots[0]);
                if (delta == null || delta.getType() == Material.AIR) {
@@ -625,14 +641,18 @@ public final class LineOperationUtil {
                }
             }
             break;
+         }
          case VOID:
+         {
             itemRequest.setAmount(limitQuantity);
             ItemStack retrieved = root.getItemStack(accessor, itemRequest);
             if (retrieved != null && retrieved.getType() != Material.AIR) {
                BlockMenuUtil.pushItem(blockMenu, retrieved, slots);
             }
             break;
+         }
          case SPECIFIED_QUANTITY:
+         {
             int existingCountx = 0;
 
             for (int slotxx : slots) {
@@ -673,6 +693,7 @@ public final class LineOperationUtil {
                   BlockMenuUtil.pushItem(blockMenu, retrievedx, openCount == slots.length ? slots : Arrays.copyOf(openBuf, openCount));
                }
             }
+         }
       }
    }
 
@@ -742,7 +763,6 @@ public final class LineOperationUtil {
       }
    }
 
-   @Generated
    private LineOperationUtil() {
       throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
    }

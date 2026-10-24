@@ -11,8 +11,8 @@ repositories {
 }
 
 dependencies {
-    compileOnly("io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT")
-    compileOnly("com.github.slimefun:Slimefun4:experimental-SNAPSHOT")
+    compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
+    compileOnly("com.github.SlimefunGuguProject:Slimefun4:2025.1")
     compileOnly("org.jetbrains:annotations:26.0.2")
     compileOnly(files("networks-original.jar"))
 }

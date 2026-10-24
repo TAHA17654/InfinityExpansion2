@@ -1,8 +1,8 @@
 package com.example.machinestacker;
 
-import me.mrCookieSlime.Slimefun.Objects.SlimefunItem.SlimefunItem;
+import io.github.thebusybiscuit.slimefun4.api.items.SlimefunItem;
 import me.mrCookieSlime.Slimefun.api.BlockStorage;
-import me.mrCookieSlime.Slimefun.Objects.handlers.BlockTicker;
+import io.github.thebusybiscuit.slimefun4.core.handlers.BlockTicker;
 import org.bukkit.Location;
 import org.bukkit.block.Block;
 

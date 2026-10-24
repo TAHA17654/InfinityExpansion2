@@ -1,0 +1,24 @@
+
+Welcome to Gradle 8.14.3!
+
+Here are the highlights of this release:
+ - Java 24 support
+ - GraalVM Native Image toolchain selection
+ - Enhancements to test reporting
+ - Build Authoring improvements
+
+For more details see https://docs.gradle.org/8.14.3/release-notes.html
+
+Starting a Gradle Daemon (subsequent builds will be faster)
+> Task :compileJava
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/compile-1792833800837.json
+
+BUILD SUCCESSFUL in 37s
+1 actionable task: 1 executed
+     1722  2026-10-24 09:23   com/balugaq/netex/utils/LineOperationUtil$1.class
+    24453  2026-10-24 09:23   com/balugaq/netex/utils/LineOperationUtil.class
+     3343  2026-10-24 09:23   com/ytdd9527/networksexpansion/implementation/machines/networks/advanced/SmartGrabber$1.class
+     1922  2026-10-24 09:23   com/ytdd9527/networksexpansion/implementation/machines/networks/advanced/SmartGrabber$2.class
+     1842  2026-10-24 09:23   com/ytdd9527/networksexpansion/implementation/machines/networks/advanced/SmartGrabber$3.class
+     7404  2026-10-24 09:23   com/ytdd9527/networksexpansion/implementation/machines/networks/advanced/SmartGrabber.class
+     2472  2026-10-24 09:23   com/balugaq/netex/utils/CompressedBridge.class

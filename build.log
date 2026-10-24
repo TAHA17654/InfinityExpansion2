@@ -1,0 +1,29 @@
+Downloading https://services.gradle.org/distributions/gradle-9.1.0-bin.zip
+............10%.............20%.............30%.............40%.............50%............60%.............70%.............80%.............90%.............100%
+
+Welcome to Gradle 9.1.0!
+
+Here are the highlights of this release:
+ - Full Java 25 support
+ - Native task graph visualization
+ - Enhanced console output
+
+For more details see https://docs.gradle.org/9.1.0/release-notes.html
+
+Starting a Gradle Daemon (subsequent builds will be faster)
+> Task :clean UP-TO-DATE
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :generateBukkitPluginDescription
+> Task :processResources
+> Task :compileKotlin
+> Task :compileJava NO-SOURCE
+> Task :classes
+> Task :jar
+> Task :compileTestKotlin NO-SOURCE
+> Task :compileTestJava NO-SOURCE
+> Task :shadowJar
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/build-1792871527221.json
+
+BUILD SUCCESSFUL in 1m 29s
+6 actionable tasks: 5 executed, 1 up-to-date
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.1.0/userguide/configuration_cache_enabling.html

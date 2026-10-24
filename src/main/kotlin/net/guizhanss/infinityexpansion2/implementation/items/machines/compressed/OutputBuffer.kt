@@ -22,9 +22,9 @@ import java.util.concurrent.ConcurrentHashMap
 /**
  * A virtual output buffer used by compressed machines.
  *
- * An [ItemStack] can never hold more than 99 items, so the "4,096 items in one stack" of compressed machines is
- * implemented by keeping the overflow in this buffer (one entry per item type, each up to [LIMIT]) and only showing
- * normal stacks in the output slots. The output slots are refilled from the buffer every tick, so hoppers, cargo
+ * An [ItemStack] can never hold more than 99 items, so the large storage of compressed machines is
+ * implemented by keeping the items in this buffer (one entry per item type, each up to [LIMIT]) and only showing
+ * normal stacks in the slots. The output slots are refilled from the buffer every tick, so hoppers, cargo
  * and players still interact with ordinary item stacks.
  */
 class OutputBuffer private constructor(private val location: Location, private val key: String) {
@@ -107,26 +107,30 @@ class OutputBuffer private constructor(private val location: Location, private v
     }
 
     /**
-     * Fills the given [slots] with the items from the buffer. A slot can hold up to [LIMIT] items,
-     * so network grabbers can take a lot of items at once.
+     * Fills the given [slots] with the items from the buffer. By default the slots only get normal stacks
+     * (never more than the max stack size of the item), because bigger stacks break the menu on the client.
+     *
+     * With [oversize], a slot gets up to [LIMIT] items. This is only meant to temporarily put the buffered inputs
+     * into the slots while the machine is running, they must be absorbed again before the tick ends.
      */
     @Synchronized
-    fun refill(menu: BlockMenu, slots: IntArray) {
+    fun refill(menu: BlockMenu, slots: IntArray, oversize: Boolean = false) {
         val iterator = entries.iterator()
         while (iterator.hasNext()) {
             val entry = iterator.next()
+            val maxStack = if (oversize) LIMIT else entry.template.maxStackSize
 
             for (slot in slots) {
                 if (entry.amount <= 0) break
 
                 val current = menu.getItemInSlot(slot)
                 if (current.isAir()) {
-                    val give = minOf(LIMIT, entry.amount)
+                    val give = minOf(maxStack, entry.amount)
                     menu.replaceExistingItem(slot, entry.template.clone().apply { amount = give })
                     entry.amount -= give
                     dirty = true
-                } else if (matches(entry.template, current!!) && current.amount < LIMIT) {
-                    val give = minOf(LIMIT - current.amount, entry.amount)
+                } else if (matches(entry.template, current!!) && current.amount < maxStack) {
+                    val give = minOf(maxStack - current.amount, entry.amount)
                     menu.replaceExistingItem(slot, current.clone().apply { amount = current.amount + give })
                     entry.amount -= give
                     dirty = true
@@ -199,9 +203,9 @@ class OutputBuffer private constructor(private val location: Location, private v
     companion object {
 
         /**
-         * The maximum amount of each item type that is stacked inside a compressed machine.
+         * The maximum amount of each item type that is stored in the buffers of a compressed machine.
          */
-        const val LIMIT = 4096
+        const val LIMIT = 32768
 
         private const val BS_OUTPUT = "output_buffer"
         private const val BS_INPUT = "input_buffer"

@@ -107,7 +107,7 @@ class MobSimulationChamber(
         }
 
         // handle stackable, a compressed chamber always works with stacked cards: N cards work as N cards
-        // (the cards are kept in the input buffer, up to 4096, because the data cards cannot be stacked normally)
+        // (the cards are kept in the input buffer, up to 32768, because the data cards cannot be stacked normally)
         val amount = if (isCompressed) {
             cardAmount
         } else if (InfinityExpansion2.configService.mobSimAllowStackedCard.value) {
@@ -145,7 +145,7 @@ class MobSimulationChamber(
             ).toInt()
 
             if (isCompressed) {
-                // the drops go into the output buffer, which holds up to 4096 of each item
+                // the drops go into the output buffer, which holds up to 32768 of each item
                 val buffer = OutputBuffer.of(menu)
                 val selected = if (InfinityExpansion2.configService.mobSimLegacyOutput.value) {
                     listOf(props.getRandomDrop() to 1.0)

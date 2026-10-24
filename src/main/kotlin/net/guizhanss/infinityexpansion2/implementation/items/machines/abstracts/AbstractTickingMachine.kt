@@ -120,7 +120,7 @@ abstract class AbstractTickingMachine(
         output.absorb(menu, outputSlots)
         if (bufferInput) {
             input.absorb(menu, inputSlots, { isBufferedInput(it) })
-            input.refill(menu, inputSlots)
+            input.refill(menu, inputSlots, oversize = true)
         }
 
         var runs = 0

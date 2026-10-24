@@ -1,0 +1,68 @@
+package com.balugaq.netex.api.enums;
+
+import com.balugaq.netex.api.algorithm.Calculator;
+import com.balugaq.netex.api.interfaces.consumers.Consumer4;
+import com.balugaq.netex.core.guide.GridNewStyleCustomAmountGuideOption;
+import com.balugaq.netex.utils.Lang;
+import com.xzavier0722.mc.plugin.slimefun4.storage.util.StorageCacheUtils;
+import io.github.thebusybiscuit.slimefun4.utils.ChatUtils;
+import java.util.function.BiFunction;
+import java.util.function.Consumer;
+import me.mrCookieSlime.Slimefun.api.inventory.BlockMenu;
+import org.bukkit.Location;
+import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.jspecify.annotations.NullMarked;
+
+@NullMarked
+public enum AmountHandleStrategy {
+   ONE((player, itemStack) -> 1),
+   STACK((player, itemStack) -> itemStack.getMaxStackSize()),
+   CUSTOM((player, itemStack) -> GridNewStyleCustomAmountGuideOption.get(player)),
+   ASK(
+      (location, player, itemStack, consumer) -> ChatUtils.awaitInput(
+            player,
+            input -> {
+               player.sendMessage(Lang.getString("messages.guide.amount-input-prompt"));
+
+               try {
+                  int value = Calculator.calculate(input).intValue();
+                  if (value <= 0 || value >= GridNewStyleCustomAmountGuideOption.GRID_NEW_STYLE_MAX_CUSTOM_AMOUNT) {
+                     player.sendMessage(
+                        String.format(
+                           Lang.getString("messages.guide.invalid-amount-input"), GridNewStyleCustomAmountGuideOption.GRID_NEW_STYLE_MAX_CUSTOM_AMOUNT
+                        )
+                     );
+                     BlockMenu menu = StorageCacheUtils.getMenu(location);
+                     if (menu != null) {
+                        menu.open(new Player[]{player});
+                     }
+
+                     return;
+                  }
+
+                  consumer.accept(value);
+               } catch (NumberFormatException var6) {
+                  player.sendMessage(
+                     String.format(Lang.getString("messages.guide.invalid-amount-input"), GridNewStyleCustomAmountGuideOption.GRID_NEW_STYLE_MAX_CUSTOM_AMOUNT)
+                  );
+                  player.sendMessage(var6.getMessage());
+               }
+            }
+         )
+   );
+
+   private final Consumer4<Location, Player, ItemStack, Consumer<Integer>> consumer;
+
+   private AmountHandleStrategy(BiFunction<Player, ItemStack, Integer> function) {
+      this.consumer = (location, player, itemStack, consumer) -> consumer.accept(function.apply(player, itemStack));
+   }
+
+   private AmountHandleStrategy(Consumer4<Location, Player, ItemStack, Consumer<Integer>> consumer) {
+      this.consumer = consumer;
+   }
+
+   public void handle(Location location, Player player, ItemStack itemStack, Consumer<Integer> consumer) {
+      this.consumer.accept(location, player, itemStack, consumer);
+   }
+}

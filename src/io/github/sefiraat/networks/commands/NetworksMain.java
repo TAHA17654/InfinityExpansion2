@@ -1,0 +1,933 @@
+package io.github.sefiraat.networks.commands;
+
+import com.balugaq.netex.api.algorithm.Calculator;
+import com.balugaq.netex.api.data.ItemContainer;
+import com.balugaq.netex.api.data.StorageUnitData;
+import com.balugaq.netex.api.enums.ErrorType;
+import com.balugaq.netex.utils.InventoryUtil;
+import com.balugaq.netex.utils.Lang;
+import com.balugaq.netex.utils.MapUtil;
+import com.xzavier0722.mc.plugin.slimefun4.storage.controller.SlimefunBlockData;
+import com.xzavier0722.mc.plugin.slimefun4.storage.util.StorageCacheUtils;
+import com.ytdd9527.networksexpansion.core.items.unusable.Blueprint;
+import com.ytdd9527.networksexpansion.implementation.machines.cellnet.collect.CollectService;
+import com.ytdd9527.networksexpansion.implementation.machines.cellnet.converter.CellQuantumConverter;
+import com.ytdd9527.networksexpansion.implementation.machines.unit.NetworksDrawer;
+import io.github.sefiraat.networks.network.NetworkRoot;
+import io.github.sefiraat.networks.network.stackcaches.BlueprintInstance;
+import io.github.sefiraat.networks.network.stackcaches.ItemRequest;
+import io.github.sefiraat.networks.network.stackcaches.QuantumCache;
+import io.github.sefiraat.networks.slimefun.NetworksSlimefunItemStacks;
+import io.github.sefiraat.networks.slimefun.network.AdminDebuggable;
+import io.github.sefiraat.networks.slimefun.network.NetworkQuantumStorage;
+import io.github.sefiraat.networks.utils.Keys;
+import io.github.sefiraat.networks.utils.StackUtils;
+import io.github.sefiraat.networks.utils.datatypes.DataTypeMethods;
+import io.github.sefiraat.networks.utils.datatypes.PersistentQuantumStorageType;
+import io.github.thebusybiscuit.slimefun4.api.items.SlimefunItem;
+import io.github.thebusybiscuit.slimefun4.implementation.Slimefun;
+import io.github.thebusybiscuit.slimefun4.libraries.dough.collections.Pair;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.stream.Collectors;
+import me.mrCookieSlime.Slimefun.api.inventory.BlockMenu;
+import org.bukkit.ChatColor;
+import org.bukkit.FluidCollisionMode;
+import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.block.Block;
+import org.bukkit.command.Command;
+import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabExecutor;
+import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.map.MapView;
+import org.bukkit.util.StringUtil;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+public class NetworksMain implements TabExecutor {
+   @NotNull
+   public static String locationToString(@Nullable Location l) {
+      if (l == null) {
+         return Lang.getString("icons.drawer.location_error.unknown");
+      } else {
+         return l.getWorld() == null
+            ? Lang.getString("icons.drawer.location_error.unknown")
+            : l.getWorld().getName() + "," + l.getBlockX() + "," + l.getBlockY() + "," + l.getBlockZ();
+      }
+   }
+
+   public static void viewLog(@NotNull Player player) {
+      Block targetBlock = player.getTargetBlockExact(8, FluidCollisionMode.NEVER);
+      if (targetBlock != null && targetBlock.getType() != Material.AIR) {
+         SlimefunItem slimefunItem = StorageCacheUtils.getSfItem(targetBlock.getLocation());
+         if (slimefunItem == null) {
+            player.sendMessage(Lang.getString("messages.commands.must-admin-debuggable"));
+         } else if (slimefunItem instanceof AdminDebuggable debuggable) {
+            if (debuggable.hasViewer(player)) {
+               debuggable.removeViewer(player);
+               player.sendMessage(Lang.getString("messages.commands.viewer-removed"));
+            } else {
+               debuggable.addViewer(player);
+               player.sendMessage(Lang.getString("messages.commands.viewer-added"));
+            }
+         } else {
+            player.sendMessage(Lang.getString("messages.commands.must-admin-debuggable"));
+         }
+      } else {
+         player.sendMessage(Lang.getString("messages.commands.must-admin-debuggable"));
+      }
+   }
+
+   public static void setQuantum(@NotNull Player player, long amount) {
+      Block targetBlock = player.getTargetBlockExact(8, FluidCollisionMode.NEVER);
+      if (targetBlock != null && targetBlock.getType() != Material.AIR) {
+         SlimefunBlockData blockData = StorageCacheUtils.getBlock(targetBlock.getLocation());
+         if (blockData == null) {
+            player.sendMessage(Lang.getString("messages.commands.must-look-at-quantum-storage"));
+         } else {
+            SlimefunItem slimefunItem = StorageCacheUtils.getSfItem(targetBlock.getLocation());
+            if (slimefunItem == null) {
+               player.sendMessage(Lang.getString("messages.commands.must-look-at-quantum-storage"));
+            } else {
+               Location targetLocation = targetBlock.getLocation();
+               if (!(slimefunItem instanceof NetworkQuantumStorage)) {
+                  player.sendMessage(Lang.getString("messages.commands.invalid-quantum-storage"));
+               } else {
+                  BlockMenu blockMenu = StorageCacheUtils.getMenu(targetLocation);
+                  if (blockMenu == null) {
+                     player.sendMessage(Lang.getString("messages.commands.invalid-quantum-storage"));
+                  } else {
+                     QuantumCache cache = NetworkQuantumStorage.getCaches().get(blockMenu.getLocation());
+                     ItemStack itemInHand = player.getInventory().getItemInMainHand();
+                     if ((cache.getItemStack() == null || cache.getItemStack().getType() == Material.AIR) && itemInHand.getType() == Material.AIR) {
+                        player.sendMessage(Lang.getString("messages.commands.must-hand-item"));
+                     } else {
+                        ItemStack clone = (itemInHand.getType() == Material.AIR ? cache.getItemStack() : itemInHand).clone();
+                        NetworkQuantumStorage.setItem(blockMenu, clone, amount);
+                        clone.setAmount(1);
+                        cache.setItemStack(clone);
+                        cache.setAmount(Math.min(amount, cache.getLimitLong()));
+                        NetworkQuantumStorage.updateDisplayItem(blockMenu, cache);
+                        NetworkQuantumStorage.syncBlock(blockMenu.getLocation(), cache);
+                        NetworkQuantumStorage.getCaches().put(blockMenu.getLocation(), cache);
+                     }
+                  }
+               }
+            }
+         }
+      } else {
+         player.sendMessage(Lang.getString("messages.commands.must-look-at-quantum-storage"));
+      }
+   }
+
+   private static void addStorageItem(@NotNull Player player, int amount) {
+      Block targetBlock = player.getTargetBlockExact(8, FluidCollisionMode.NEVER);
+      if (targetBlock != null && targetBlock.getType() != Material.AIR) {
+         ItemStack itemInHand = player.getInventory().getItemInMainHand();
+         if (itemInHand.getType() == Material.AIR) {
+            player.sendMessage(Lang.getString("messages.commands.must-hand-item"));
+         } else {
+            SlimefunBlockData blockData = StorageCacheUtils.getBlock(targetBlock.getLocation());
+            if (blockData == null) {
+               player.sendMessage(Lang.getString("messages.commands.must-look-at-drawer"));
+            } else {
+               SlimefunItem slimefunItem = StorageCacheUtils.getSfItem(targetBlock.getLocation());
+               if (slimefunItem == null) {
+                  player.sendMessage(Lang.getString("messages.commands.must-look-at-drawer"));
+               } else {
+                  if (!(slimefunItem instanceof NetworksDrawer)) {
+                     player.sendMessage(Lang.getString("messages.commands.must-look-at-drawer"));
+                  }
+
+                  Location targetLocation = targetBlock.getLocation();
+                  ItemStack clone = itemInHand.clone();
+                  StorageUnitData data = NetworksDrawer.getStorageData(targetLocation);
+                  if (data == null) {
+                     player.sendMessage(Lang.getString("messages.commands.invalid-drawer"));
+                  } else {
+                     clone.setAmount(amount);
+                     data.depositItemStack(player.getLocation(), clone, false);
+                     NetworksDrawer.setStorageData(targetLocation, data);
+                     player.sendMessage(Lang.getString("messages.commands.updated-drawer"));
+                  }
+               }
+            }
+         }
+      } else {
+         player.sendMessage(Lang.getString("messages.commands.must-look-at-drawer"));
+      }
+   }
+
+   private static void reduceStorageItem(@NotNull Player player, int amount) {
+      Block targetBlock = player.getTargetBlockExact(8, FluidCollisionMode.NEVER);
+      if (targetBlock != null && targetBlock.getType() != Material.AIR) {
+         ItemStack itemInHand = player.getInventory().getItemInMainHand();
+         if (itemInHand.getType() == Material.AIR) {
+            player.sendMessage(Lang.getString("messages.commands.must-hand-item"));
+         } else {
+            SlimefunBlockData blockData = StorageCacheUtils.getBlock(targetBlock.getLocation());
+            if (blockData == null) {
+               player.sendMessage(Lang.getString("messages.commands.must-look-at-drawer"));
+            } else {
+               SlimefunItem slimefunItem = StorageCacheUtils.getSfItem(targetBlock.getLocation());
+               if (slimefunItem == null) {
+                  player.sendMessage(Lang.getString("messages.commands.must-look-at-drawer"));
+               } else {
+                  if (!(slimefunItem instanceof NetworksDrawer)) {
+                     player.sendMessage(Lang.getString("messages.commands.must-look-at-drawer"));
+                  }
+
+                  Location targetLocation = targetBlock.getLocation();
+                  ItemStack clone = itemInHand.clone();
+                  StorageUnitData data = NetworksDrawer.getStorageData(targetLocation);
+                  if (data == null) {
+                     player.sendMessage(Lang.getString("messages.commands.invalid-drawer"));
+                  } else {
+                     clone.setAmount(1);
+                     data.requestItem(player.getLocation(), new ItemRequest(clone, amount));
+                     NetworksDrawer.setStorageData(targetLocation, data);
+                     player.sendMessage(Lang.getString("messages.commands.updated-drawer"));
+                  }
+               }
+            }
+         }
+      } else {
+         player.sendMessage(Lang.getString("messages.commands.must-look-at-drawer"));
+      }
+   }
+
+   public static void setContainerId(@NotNull Player player, int containerId) {
+      Block targetBlock = player.getTargetBlockExact(8, FluidCollisionMode.NEVER);
+      if (targetBlock != null && targetBlock.getType() != Material.AIR) {
+         SlimefunItem slimefunItem = StorageCacheUtils.getSfItem(targetBlock.getLocation());
+         if (slimefunItem == null) {
+            player.sendMessage(Lang.getString("messages.commands.must-look-at-drawer"));
+         } else if (!(slimefunItem instanceof NetworksDrawer)) {
+            player.sendMessage(Lang.getString("messages.commands.must-look-at-drawer"));
+         } else {
+            Location location = targetBlock.getLocation();
+            player.sendMessage(Lang.getString("messages.commands.wait-for-data"));
+            NetworksDrawer.requestData(location, containerId);
+            player.sendMessage(String.format(Lang.getString("messages.commands.set-container-id"), locationToString(location), containerId));
+         }
+      } else {
+         player.sendMessage(Lang.getString("messages.commands.must-look-at-drawer"));
+      }
+   }
+
+   private static void updateItem(@NotNull Player player) {
+      ItemStack itemInHand = player.getInventory().getItemInMainHand();
+      SlimefunItem slimefunItem = SlimefunItem.getByItem(itemInHand);
+      if (slimefunItem == null) {
+         player.sendMessage(Lang.getString("messages.commands.not-a-slimefun-item"));
+      } else {
+         String currentId = slimefunItem.getId();
+         if (slimefunItem instanceof NetworksDrawer) {
+            player.sendMessage(Lang.getString("messages.commands.cannot-update-cargo-storage-unit"));
+         } else if (slimefunItem instanceof NetworkQuantumStorage) {
+            ItemMeta meta = itemInHand.getItemMeta();
+            QuantumCache quantumCache = Keys.getQuantumCache(meta);
+            if (quantumCache == null || quantumCache.getItemStack() == null) {
+               SlimefunItem sf = SlimefunItem.getById(currentId);
+               if (sf != null) {
+                  itemInHand.setItemMeta(sf.getItem().getItemMeta());
+               }
+
+               player.sendMessage(Lang.getString("messages.commands.updated-item"));
+               return;
+            }
+
+            ItemStack stored = quantumCache.getItemStack();
+            SlimefunItem sfi = SlimefunItem.getByItem(stored);
+            if (sfi != null) {
+               String quantumStoredId = sfi.getId();
+               SlimefunItem sf = SlimefunItem.getById(quantumStoredId);
+               if (sf != null) {
+                  stored.setItemMeta(sf.getItem().getItemMeta());
+               }
+
+               player.sendMessage(Lang.getString("messages.commands.updated-item-in-quantum-storage"));
+            }
+
+            DataTypeMethods.setCustom(meta, Keys.QUANTUM_STORAGE_INSTANCE, PersistentQuantumStorageType.TYPE, quantumCache);
+            quantumCache.updateMetaLore(meta);
+            itemInHand.setItemMeta(meta);
+            player.sendMessage(Lang.getString("messages.commands.updated-item"));
+         } else {
+            SlimefunItem sf = SlimefunItem.getById(currentId);
+            if (sf != null) {
+               itemInHand.setItemMeta(sf.getItem().getItemMeta());
+            }
+
+            player.sendMessage(Lang.getString("messages.commands.updated-item"));
+         }
+      }
+   }
+
+   public static void getStorageItem(@NotNull Player player, int slot) {
+      Block targetBlock = player.getTargetBlockExact(8, FluidCollisionMode.NEVER);
+      if (targetBlock != null && targetBlock.getType() != Material.AIR) {
+         SlimefunBlockData blockData = StorageCacheUtils.getBlock(targetBlock.getLocation());
+         if (blockData == null) {
+            player.sendMessage(Lang.getString("messages.commands.must-look-at-drawer"));
+         } else {
+            SlimefunItem slimefunItem = StorageCacheUtils.getSfItem(targetBlock.getLocation());
+            if (slimefunItem == null) {
+               player.sendMessage(Lang.getString("messages.commands.must-look-at-drawer"));
+            } else {
+               if (!(slimefunItem instanceof NetworksDrawer)) {
+                  player.sendMessage(Lang.getString("messages.commands.must-look-at-drawer"));
+               }
+
+               Location targetLocation = targetBlock.getLocation();
+               StorageUnitData data = NetworksDrawer.getStorageData(targetLocation);
+               if (data == null) {
+                  player.sendMessage(Lang.getString("messages.commands.invalid-drawer"));
+               } else {
+                  List<ItemContainer> stored = data.getStoredItems();
+                  if (slot >= stored.size()) {
+                     player.sendMessage(String.format(Lang.getString("messages.commands.invalid-slot"), stored.size() - 1));
+                  } else {
+                     ItemStack stack = stored.get(slot).getSampleDirectly();
+                     if (stack == null || stack.getType() == Material.AIR) {
+                        player.sendMessage(Lang.getString("messages.commands.empty-slot"));
+                        return;
+                     }
+
+                     InventoryUtil.addItem(player, StackUtils.getAsQuantity(stack, 1));
+                  }
+               }
+            }
+         }
+      } else {
+         player.sendMessage(Lang.getString("messages.commands.must-look-at-drawer"));
+      }
+   }
+
+   public static void help(@NotNull CommandSender sender, @Nullable String mainCommand) {
+      if (mainCommand == null) {
+         for (String message : Lang.getStringList("messages.commands.help")) {
+            sender.sendMessage(message);
+         }
+      } else {
+         String var2 = mainCommand.toLowerCase(Locale.ROOT);
+         switch (var2) {
+            case "help":
+               for (String message : Lang.getStringList("messages.commands.example.help")) {
+                  sender.sendMessage(message);
+               }
+               break;
+            case "celltoquantum":
+               for (String message : Lang.getStringList("messages.commands.example.celltoquantum")) {
+                  sender.sendMessage(message);
+               }
+               break;
+            case "fillquantum":
+               for (String message : Lang.getStringList("messages.commands.example.fillquantum")) {
+                  sender.sendMessage(message);
+               }
+               break;
+            case "fixblueprint":
+               for (String message : Lang.getStringList("messages.commands.example.fixblueprint")) {
+                  sender.sendMessage(message);
+               }
+               break;
+            case "addstorageitem":
+               for (String message : Lang.getStringList("messages.commands.example.addstorageitem")) {
+                  sender.sendMessage(message);
+               }
+               break;
+            case "reducestorageitem":
+               for (String message : Lang.getStringList("messages.commands.example.reducestorageitem")) {
+                  sender.sendMessage(message);
+               }
+               break;
+            case "setquantum":
+               for (String message : Lang.getStringList("messages.commands.example.setquantum")) {
+                  sender.sendMessage(message);
+               }
+               break;
+            case "setcontainerid":
+               for (String message : Lang.getStringList("messages.commands.example.setcontainerid")) {
+                  sender.sendMessage(message);
+               }
+               break;
+            case "getstorageitem":
+               for (String message : Lang.getStringList("messages.commands.example.getstorageitem")) {
+                  sender.sendMessage(message);
+               }
+               break;
+            case "worldedit":
+               for (String message : Lang.getStringList("messages.commands.example.worldedit")) {
+                  sender.sendMessage(message);
+               }
+               break;
+            case "updateitem":
+               for (String message : Lang.getStringList("messages.commands.example.updateitem")) {
+                  sender.sendMessage(message);
+               }
+               break;
+            case "viewlog":
+               for (String message : Lang.getStringList("messages.commands.example.viewlog")) {
+                  sender.sendMessage(message);
+               }
+               break;
+            default:
+               for (String message : Lang.getStringList("messages.commands.example.unknown-command")) {
+                  sender.sendMessage(message);
+               }
+         }
+      }
+   }
+
+   public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
+      if (args.length == 0) {
+         help(sender, null);
+         return true;
+      } else {
+         String player = args[0];
+         switch (player) {
+            case "fillquantum":
+            case "fixblueprint":
+            case "addstorageitem":
+            case "reducestorageitem":
+            case "setquantum":
+            case "setcontainerid":
+            case "celltoquantum":
+            case "unbind":
+               if (!(sender instanceof Player)) {
+                  sender.sendMessage(this.getErrorMessage(ErrorType.MUST_BE_PLAYER));
+                  return false;
+               }
+            case "help":
+            default:
+               if (args[0].toLowerCase(Locale.ROOT).equals("help")) {
+                  if (sender.isOp()) {
+                     if (args.length >= 2) {
+                        help(sender, args[1]);
+                     } else {
+                        help(sender, null);
+                     }
+                  } else {
+                     sender.sendMessage(this.getErrorMessage(ErrorType.NO_PERMISSION));
+                  }
+
+                  return true;
+               } else {
+                  if (sender instanceof Player playerx) {
+                     String var26 = args[0].toLowerCase(Locale.ROOT);
+                     switch (var26) {
+                        case "fillquantum":
+                           if (!playerx.hasPermission("networks.admin") && !playerx.hasPermission("networks.commands.fillquantum")) {
+                              playerx.sendMessage(this.getErrorMessage(ErrorType.NO_PERMISSION));
+                              return true;
+                           }
+
+                           if (args.length == 1) {
+                              playerx.sendMessage(this.getErrorMessage(ErrorType.MISSING_REQUIRED_ARGUMENT, "amount"));
+                              return true;
+                           }
+
+                           try {
+                              long amount = Calculator.calculate(args[1]).longValue();
+                              if (amount < 0L || amount > 140737488355328L) {
+                                 playerx.sendMessage(this.getErrorMessage(ErrorType.INVALID_REQUIRED_ARGUMENT, "amount"));
+                                 return true;
+                              }
+
+                              this.fillQuantum(playerx, amount);
+                           } catch (NumberFormatException var24) {
+                              if ("full".equals(args[1])) {
+                                 this.fillQuantum(playerx, 140737488355328L);
+                                 return true;
+                              }
+
+                              playerx.sendMessage(this.getErrorMessage(ErrorType.INVALID_REQUIRED_ARGUMENT, "amount"));
+                              playerx.sendMessage(var24.getMessage());
+                           }
+
+                           return true;
+                        case "fixblueprint":
+                           if (!playerx.hasPermission("networks.admin") && !playerx.hasPermission("networks.commands.fixblueprint")) {
+                              playerx.sendMessage(this.getErrorMessage(ErrorType.NO_PERMISSION));
+                              return true;
+                           }
+
+                           if (args.length == 1) {
+                              playerx.sendMessage(this.getErrorMessage(ErrorType.MISSING_REQUIRED_ARGUMENT, "keyInMeta"));
+                              return true;
+                           }
+
+                           String before = args[1];
+                           this.fixBlueprint(playerx, before);
+                           return true;
+                        case "setquantum":
+                           if (!playerx.hasPermission("networks.admin") && !playerx.hasPermission("networks.commands.setquantum")) {
+                              playerx.sendMessage(this.getErrorMessage(ErrorType.NO_PERMISSION));
+                              return true;
+                           }
+
+                           if (args.length == 1) {
+                              playerx.sendMessage(this.getErrorMessage(ErrorType.MISSING_REQUIRED_ARGUMENT, "amount"));
+                              return true;
+                           }
+
+                           try {
+                              long amount = Calculator.calculate(args[1]).longValue();
+                              if (amount < 0L || amount > 140737488355328L) {
+                                 throw new NumberFormatException("");
+                              }
+
+                              setQuantum(playerx, amount);
+                           } catch (NumberFormatException var23) {
+                              if ("full".equals(args[1])) {
+                                 setQuantum(playerx, 140737488355328L);
+                                 return true;
+                              }
+
+                              playerx.sendMessage(this.getErrorMessage(ErrorType.INVALID_REQUIRED_ARGUMENT, "amount"));
+                              playerx.sendMessage(var23.getMessage());
+                           }
+
+                           return true;
+                        case "celltoquantum":
+                           if (!playerx.hasPermission("networks.admin") && !playerx.hasPermission("networks.commands.celltoquantum")) {
+                              playerx.sendMessage(this.getErrorMessage(ErrorType.NO_PERMISSION));
+                              return true;
+                           }
+
+                           this.convertCellToQuantumStorage(playerx);
+                           return true;
+                        case "addstorageitem":
+                           if (!playerx.hasPermission("networks.admin") && !playerx.hasPermission("networks.commands.addstorageitem")) {
+                              playerx.sendMessage(this.getErrorMessage(ErrorType.NO_PERMISSION));
+                              return true;
+                           }
+
+                           if (args.length == 1) {
+                              playerx.sendMessage(this.getErrorMessage(ErrorType.MISSING_REQUIRED_ARGUMENT, "amount"));
+                              return true;
+                           }
+
+                           try {
+                              int amount = Calculator.calculate(args[1]).intValue();
+                              addStorageItem(playerx, amount);
+                           } catch (NumberFormatException var22) {
+                              playerx.sendMessage(this.getErrorMessage(ErrorType.INVALID_REQUIRED_ARGUMENT, "amount"));
+                              playerx.sendMessage(var22.getMessage());
+                           }
+
+                           return true;
+                        case "reducestorageitem":
+                           if (!playerx.hasPermission("networks.admin") && !playerx.hasPermission("networks.commands.reducestorageitem")) {
+                              playerx.sendMessage(this.getErrorMessage(ErrorType.NO_PERMISSION));
+                              return true;
+                           }
+
+                           if (args.length == 1) {
+                              playerx.sendMessage(this.getErrorMessage(ErrorType.MISSING_REQUIRED_ARGUMENT, "amount"));
+                              return true;
+                           }
+
+                           try {
+                              int amount = Calculator.calculate(args[1]).intValue();
+                              reduceStorageItem(playerx, amount);
+                           } catch (NumberFormatException var21) {
+                              playerx.sendMessage(this.getErrorMessage(ErrorType.INVALID_REQUIRED_ARGUMENT, "amount"));
+                              playerx.sendMessage(var21.getMessage());
+                           }
+
+                           return true;
+                        case "setcontainerid":
+                           if (!playerx.hasPermission("networks.admin") && !playerx.hasPermission("networks.commands.setcontainerid")) {
+                              playerx.sendMessage(this.getErrorMessage(ErrorType.NO_PERMISSION));
+                              return true;
+                           }
+
+                           if (args.length == 1) {
+                              playerx.sendMessage(this.getErrorMessage(ErrorType.MISSING_REQUIRED_ARGUMENT, "containerId"));
+                              return true;
+                           }
+
+                           try {
+                              int containerId = Calculator.calculate(args[1]).intValue();
+                              setContainerId(playerx, containerId);
+                           } catch (NumberFormatException var20) {
+                              playerx.sendMessage(this.getErrorMessage(ErrorType.INVALID_REQUIRED_ARGUMENT, "containerId"));
+                              playerx.sendMessage(var20.getMessage());
+                           }
+
+                           return true;
+                        case "updateitem":
+                           if (!playerx.hasPermission("networks.admin") && !playerx.hasPermission("networks.commands.updateitem")) {
+                              playerx.sendMessage(this.getErrorMessage(ErrorType.NO_PERMISSION));
+                              return true;
+                           }
+
+                           updateItem(playerx);
+                           return true;
+                        case "getstorageitem":
+                           if (!playerx.hasPermission("networks.admin") && !playerx.hasPermission("networks.commands.getstorageitem")) {
+                              playerx.sendMessage(this.getErrorMessage(ErrorType.NO_PERMISSION));
+                              return true;
+                           }
+
+                           if (args.length <= 2) {
+                              playerx.sendMessage(this.getErrorMessage(ErrorType.MISSING_REQUIRED_ARGUMENT, "slot"));
+                              return true;
+                           }
+
+                           try {
+                              int slot = Calculator.calculate(args[1]).intValue();
+                              getStorageItem(playerx, slot);
+                           } catch (NumberFormatException var19) {
+                              playerx.sendMessage(this.getErrorMessage(ErrorType.INVALID_REQUIRED_ARGUMENT, "slot"));
+                              playerx.sendMessage(var19.getMessage());
+                           }
+
+                           return true;
+                        case "viewlog":
+                           if (!playerx.hasPermission("networks.admin") && !playerx.hasPermission("networks.commands.viewlog")) {
+                              playerx.sendMessage(this.getErrorMessage(ErrorType.NO_PERMISSION));
+                              return true;
+                           }
+
+                           viewLog(playerx);
+                           return true;
+                        case "map":
+                           if (!playerx.hasPermission("networks.admin") && !playerx.hasPermission("networks.commands.map")) {
+                              playerx.sendMessage(this.getErrorMessage(ErrorType.NO_PERMISSION));
+                              return true;
+                           }
+
+                           if (args.length == 1) {
+                              playerx.sendMessage(this.getErrorMessage(ErrorType.MISSING_REQUIRED_ARGUMENT, "filePath"));
+                              return true;
+                           }
+
+                           String filePath = args[1];
+                           Pair<ItemStack, MapView> pair = MapUtil.getImageItem(filePath);
+                           ItemStack first = (ItemStack)pair.getFirstValue();
+                           MapView second = (MapView)pair.getSecondValue();
+                           if (second == null) {
+                              playerx.sendMessage(this.getErrorMessage(ErrorType.INVALID_REQUIRED_ARGUMENT, "filePath"));
+                              return true;
+                           }
+
+                           if (first != null) {
+                              InventoryUtil.addItem(playerx, first);
+                              playerx.sendMap(second);
+                           }
+                           break;
+                        case "cch":
+                           if (!playerx.hasPermission("networks.admin") && !playerx.hasPermission("networks.commands.cch")) {
+                              playerx.sendMessage(this.getErrorMessage(ErrorType.NO_PERMISSION));
+                              return true;
+                           }
+
+                           if (args.length == 1) {
+                              playerx.sendMessage(this.getErrorMessage(ErrorType.MISSING_REQUIRED_ARGUMENT, "cchName"));
+                              return true;
+                           }
+
+                           Block targetBlock = playerx.getTargetBlockExact(8, FluidCollisionMode.NEVER);
+                           if (targetBlock == null || targetBlock.getType() == Material.AIR) {
+                              playerx.sendMessage(Lang.getString("messages.commands.must-admin-debuggable"));
+                              return true;
+                           }
+
+                           SlimefunItem slimefunItem = StorageCacheUtils.getSfItem(targetBlock.getLocation());
+                           if (slimefunItem == null || !(slimefunItem instanceof AdminDebuggable)) {
+                              playerx.sendMessage(Lang.getString("messages.commands.must-admin-debuggable"));
+                              return true;
+                           }
+
+                           Location lookingAt = targetBlock.getLocation();
+                           String cchName = args[1];
+                           Map<Location, ?> map;
+                           switch (cchName) {
+                              case "l":
+                                 playerx.sendMessage(new String[]{"l", "oah", "pah", "tmih", "tmoh", "caih", "caoh"});
+                                 return true;
+                              case "oah":
+                                 map = NetworkRoot.getObservingAccessHistory();
+                                 break;
+                              case "pah":
+                                 map = NetworkRoot.getPersistentAccessHistory();
+                                 break;
+                              case "tmih":
+                                 map = NetworkRoot.getTransportMissInputHistory();
+                                 break;
+                              case "tmoh":
+                                 map = NetworkRoot.getTransportMissOutputHistory();
+                                 break;
+                              case "caih":
+                                 map = NetworkRoot.getControlledAccessInputHistory();
+                                 break;
+                              case "caoh":
+                                 map = NetworkRoot.getControlledAccessOutputHistory();
+                                 break;
+                              default:
+                                 playerx.sendMessage(this.getErrorMessage(ErrorType.INVALID_REQUIRED_ARGUMENT, "cchName"));
+                                 return true;
+                           }
+
+                           Object value = map.get(lookingAt);
+                           if (value == null) {
+                              playerx.sendMessage("no cache yet.");
+                           }
+
+                           if (value instanceof Map) {
+                              playerx.sendMessage("Cache: " + cchName);
+                              Map<Location, Integer> locations = (Map<Location, Integer>)value;
+                              Map<String, Integer> formatted = locations.entrySet()
+                                 .stream()
+                                 .map(
+                                    e -> {
+                                       SlimefunItem sf = StorageCacheUtils.getSfItem(e.getKey());
+                                       return sf == null
+                                          ? Map.entry(e.getKey().toString(), e.getValue())
+                                          : Map.entry(ChatColor.translateAlternateColorCodes('&', sf.getItemName()), e.getValue());
+                                    }
+                                 )
+                                 .collect(Collectors.toMap(Entry::getKey, Entry::getValue));
+
+                              for (Entry<String, Integer> entry : formatted.entrySet()) {
+                                 playerx.sendMessage(entry.getKey() + ": " + entry.getValue());
+                              }
+                           } else if (value instanceof Number n) {
+                              playerx.sendMessage("Cache: " + cchName);
+                              playerx.sendMessage("Value: " + n.intValue());
+                           }
+                           break;
+                        case "unbind":
+                           ItemStack weapon = playerx.getInventory().getItemInMainHand();
+                           if (CollectService.hasMark(weapon)) {
+                              CollectService.unbind(weapon);
+                              playerx.sendMessage(Lang.getString("messages.cellnet.collect.unbind"));
+                           } else {
+                              playerx.sendMessage(Lang.getString("messages.cellnet.collect.no-bind"));
+                           }
+
+                           return true;
+                        default:
+                           help(playerx, null);
+                     }
+                  }
+
+                  return true;
+               }
+         }
+      }
+   }
+
+   public void fillQuantum(@NotNull Player player, long amount) {
+      ItemStack itemStack = player.getInventory().getItemInMainHand();
+      if (itemStack.getType() == Material.AIR) {
+         player.sendMessage(Lang.getString("messages.commands.no-item-in-hand"));
+      } else {
+         SlimefunItem slimefunItem = SlimefunItem.getByItem(itemStack);
+         if (!(slimefunItem instanceof NetworkQuantumStorage)) {
+            player.sendMessage(Lang.getString("messages.commands.must-hand-quantum-storage"));
+         } else {
+            ItemMeta meta = itemStack.getItemMeta();
+            QuantumCache quantumCache = Keys.getQuantumCache(meta);
+            if (quantumCache != null && quantumCache.getItemStack() != null) {
+               quantumCache.setAmount(Math.min(amount, 140737488355328L));
+               DataTypeMethods.setCustom(meta, Keys.QUANTUM_STORAGE_INSTANCE, PersistentQuantumStorageType.TYPE, quantumCache);
+               quantumCache.updateMetaLore(meta);
+               itemStack.setItemMeta(meta);
+               player.sendMessage(Lang.getString("messages.commands.updated-quantum-storage"));
+            } else {
+               player.sendMessage(Lang.getString("messages.commands.no-set-item"));
+            }
+         }
+      }
+   }
+
+   public void convertCellToQuantumStorage(@NotNull Player player) {
+      CellQuantumConverter.convert(player);
+   }
+
+   public void fixBlueprint(@NotNull Player player, @NotNull String before) {
+      ItemStack blueprint = player.getInventory().getItemInMainHand();
+      if (blueprint.getType() == Material.AIR) {
+         player.sendMessage(Lang.getString("messages.commands.must-hand-blueprint"));
+      } else {
+         SlimefunItem item = SlimefunItem.getByItem(blueprint);
+         if (!(item instanceof Blueprint)) {
+            player.sendMessage(Lang.getString("messages.commands.must-hand-blueprint"));
+         } else {
+            ItemMeta blueprintMeta = blueprint.getItemMeta();
+            BlueprintInstance instance = Keys.getBlueprintInstance(blueprintMeta);
+            if (instance == null) {
+               player.sendMessage(Lang.getString("messages.commands.invalid-blueprint"));
+            } else {
+               ItemStack fix = NetworksSlimefunItemStacks.CRAFTING_BLUEPRINT.clone();
+               ItemStack item2 = instance.getItemStack();
+               if (item2 != null) {
+                  Blueprint.setBlueprint(fix, instance.getRecipeItems(), item2);
+               }
+
+               blueprint.setItemMeta(fix.getItemMeta());
+               player.sendMessage(Lang.getString("messages.commands.fixed-blueprint"));
+            }
+         }
+      }
+   }
+
+   @Nullable
+   public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
+      List<String> raw = this.onTabCompleteRaw(sender, args);
+      return (List<String>)StringUtil.copyPartialMatches(args[args.length - 1], raw, new ArrayList());
+   }
+
+   @NotNull
+   public List<String> onTabCompleteRaw(@NotNull CommandSender sender, @NotNull String[] args) {
+      switch (args.length) {
+         case 1:
+            return List.of(
+               "addStorageItem",
+               "celltoQuantum",
+               "unbind",
+               "fillQuantum",
+               "fixBlueprint",
+               "getStorageItem",
+               "help",
+               "reduceStorageItem",
+               "setContainerId",
+               "setQuantum",
+               "updateItem",
+               "viewLog",
+               "worldedit"
+            );
+         case 2:
+            String var6 = args[0].toLowerCase(Locale.ROOT);
+
+            return switch (var6) {
+               case "getstorageitem" -> List.of("<slot>");
+               case "fillquantum", "addstorageitem", "reducestorageitem", "setquantum" -> List.of("<amount>");
+               case "fixblueprint" -> List.of("<keyInMeta>");
+               case "setcontainerid" -> List.of("<containerId>");
+               case "worldedit" -> List.of("pos1", "pos2", "paste", "clear", "clone", "blockmenu", "blockinfo", "clearpos", "showareaoutline");
+               default -> List.of();
+            };
+         case 3:
+            if (args[0].equalsIgnoreCase("worldedit")) {
+               String var5 = args[1];
+
+               return switch (var5) {
+                  case "paste" -> Slimefun.getRegistry()
+                  .getAllSlimefunItems()
+                  .stream()
+                  .filter(sfItem -> sfItem.getItem().getType().isBlock())
+                  .map(SlimefunItem::getId)
+                  .toList();
+                  case "blockinfo" -> List.of("add", "remove", "set");
+                  case "blockmenu" -> List.of("setSlot");
+                  case "clear" -> List.of("true", "false");
+                  default -> List.of();
+               };
+            }
+            break;
+         case 4:
+            if (args[0].equalsIgnoreCase("worldedit")) {
+               String var3 = args[1].toLowerCase(Locale.ROOT);
+
+               return switch (var3) {
+                  case "paste" -> List.of("override", "keep");
+                  case "blockmenu" -> "setslot".equals(args[2].toLowerCase(Locale.ROOT))
+                  ? List.of(
+                     "0",
+                     "1",
+                     "2",
+                     "3",
+                     "4",
+                     "5",
+                     "6",
+                     "7",
+                     "8",
+                     "9",
+                     "10",
+                     "11",
+                     "12",
+                     "13",
+                     "14",
+                     "15",
+                     "16",
+                     "17",
+                     "18",
+                     "19",
+                     "20",
+                     "21",
+                     "22",
+                     "23",
+                     "24",
+                     "25",
+                     "26",
+                     "27",
+                     "28",
+                     "29",
+                     "30",
+                     "31",
+                     "32",
+                     "33",
+                     "34",
+                     "35",
+                     "36",
+                     "37",
+                     "38",
+                     "39",
+                     "40",
+                     "41",
+                     "42",
+                     "43",
+                     "44",
+                     "45",
+                     "46",
+                     "47",
+                     "48",
+                     "49",
+                     "50",
+                     "51",
+                     "52",
+                     "53"
+                  )
+                  : List.of();
+                  case "clear" -> List.of("true", "false");
+                  default -> List.of();
+               };
+            }
+            break;
+         case 5:
+            if (args[0].equalsIgnoreCase("worldedit") && args[1].equalsIgnoreCase("paste")) {
+               return List.of("true", "false");
+            }
+      }
+
+      return new ArrayList<>();
+   }
+
+   @NotNull
+   public String getErrorMessage(@NotNull ErrorType errorType) {
+      return this.getErrorMessage(errorType, null);
+   }
+
+   @NotNull
+   public String getErrorMessage(@NotNull ErrorType errorType, String argument) {
+      return switch (errorType) {
+         case NO_PERMISSION -> Lang.getString("messages.commands.no-permission");
+         case NO_ITEM_IN_HAND -> Lang.getString("messages.commands.no-item-in-hand");
+         case MISSING_REQUIRED_ARGUMENT -> String.format(Lang.getString("messages.commands.missing-required-argument"), argument);
+         case INVALID_REQUIRED_ARGUMENT -> String.format(Lang.getString("messages.commands.invalid-required-argument"), argument);
+         case MUST_BE_PLAYER -> Lang.getString("messages.commands.must-be-player");
+         default -> Lang.getString("messages.commands.unknown-error");
+      };
+   }
+}

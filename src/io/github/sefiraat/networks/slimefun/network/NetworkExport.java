@@ -1,0 +1,123 @@
+package io.github.sefiraat.networks.slimefun.network;
+
+import com.balugaq.netex.api.enums.FeedbackType;
+import com.balugaq.netex.api.helpers.Icon;
+import com.balugaq.netex.utils.BlockMenuUtil;
+import com.xzavier0722.mc.plugin.slimefun4.storage.controller.SlimefunBlockData;
+import com.xzavier0722.mc.plugin.slimefun4.storage.util.StorageCacheUtils;
+import io.github.sefiraat.networks.NetworkStorage;
+import io.github.sefiraat.networks.network.NodeDefinition;
+import io.github.sefiraat.networks.network.NodeType;
+import io.github.sefiraat.networks.network.stackcaches.ItemRequest;
+import io.github.sefiraat.networks.slimefun.NetworkSlimefunItems;
+import io.github.thebusybiscuit.slimefun4.api.items.ItemGroup;
+import io.github.thebusybiscuit.slimefun4.api.items.ItemHandler;
+import io.github.thebusybiscuit.slimefun4.api.items.ItemSetting;
+import io.github.thebusybiscuit.slimefun4.api.items.SlimefunItem;
+import io.github.thebusybiscuit.slimefun4.api.items.SlimefunItemStack;
+import io.github.thebusybiscuit.slimefun4.api.items.settings.IntRangeSetting;
+import io.github.thebusybiscuit.slimefun4.api.recipes.RecipeType;
+import io.github.thebusybiscuit.slimefun4.core.handlers.BlockBreakHandler;
+import io.github.thebusybiscuit.slimefun4.implementation.Slimefun;
+import io.github.thebusybiscuit.slimefun4.libraries.dough.protection.Interaction;
+import java.util.List;
+import me.mrCookieSlime.Slimefun.Objects.handlers.BlockTicker;
+import me.mrCookieSlime.Slimefun.api.inventory.BlockMenu;
+import me.mrCookieSlime.Slimefun.api.inventory.BlockMenuPreset;
+import me.mrCookieSlime.Slimefun.api.item_transport.ItemTransportFlow;
+import org.bukkit.Material;
+import org.bukkit.block.Block;
+import org.bukkit.entity.Player;
+import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.inventory.ItemStack;
+import org.jetbrains.annotations.NotNull;
+
+public class NetworkExport extends NetworkObject {
+   private static final int[] BACKGROUND_SLOTS = new int[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 13, 17, 18, 22, 26, 27, 31, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44};
+   private static final int TEST_ITEM_SLOT = 20;
+   private static final int[] TEST_ITEM_BACKDROP = new int[]{10, 11, 12, 19, 21, 28, 29, 30};
+   private static final int OUTPUT_ITEM_SLOT = 24;
+   private static final int[] OUTPUT_ITEM_BACKDROP = new int[]{14, 15, 16, 23, 25, 32, 33, 34};
+   @NotNull
+   private final ItemSetting<Integer> tickRate = new IntRangeSetting(this, "tick_rate", 1, 1, 10);
+
+   public NetworkExport(@NotNull ItemGroup itemGroup, @NotNull SlimefunItemStack item, @NotNull RecipeType recipeType, ItemStack[] recipe, ItemStack output) {
+      super(itemGroup, item, recipeType, recipe, output, NodeType.EXPORT);
+      this.addItemSetting(new ItemSetting[]{this.tickRate});
+      this.getSlotsToDrop().add(20);
+      this.getSlotsToDrop().add(24);
+      this.addItemHandler(new ItemHandler[]{new BlockTicker() {
+         private int tick = 1;
+
+         public boolean isSynchronized() {
+            return false;
+         }
+
+         public void tick(@NotNull Block block, SlimefunItem item, @NotNull SlimefunBlockData data) {
+            if (this.tick <= 1) {
+               BlockMenu blockMenu = data.getBlockMenu();
+               if (blockMenu == null) {
+                  return;
+               }
+
+               NetworkExport.this.addToRegistry(block);
+               NetworkExport.this.tryFetchItem(blockMenu);
+            }
+         }
+
+         public void uniqueTick() {
+            this.tick = this.tick <= 1 ? (Integer)NetworkExport.this.tickRate.getValue() : this.tick - 1;
+         }
+      }, new BlockBreakHandler(true, true) {
+         public void onPlayerBreak(@NotNull BlockBreakEvent e, @NotNull ItemStack item, @NotNull List<ItemStack> drops) {
+            BlockMenu blockMenu = StorageCacheUtils.getMenu(e.getBlock().getLocation());
+            if (blockMenu != null) {
+               blockMenu.dropItems(blockMenu.getLocation(), new int[]{20});
+               blockMenu.dropItems(blockMenu.getLocation(), new int[]{24});
+            }
+         }
+      }});
+   }
+
+   private void tryFetchItem(@NotNull BlockMenu blockMenu) {
+      NodeDefinition definition = NetworkStorage.getNode(blockMenu.getLocation());
+      if (definition.getNode() == null) {
+         this.sendFeedback(blockMenu.getLocation(), FeedbackType.NO_NETWORK_FOUND);
+      } else {
+         ItemStack testItem = blockMenu.getItemInSlot(20);
+         ItemStack itemInOutput = blockMenu.getItemInSlot(24);
+         if (testItem != null && (itemInOutput == null || itemInOutput.getType() == Material.AIR)) {
+            ItemStack clone = testItem.clone();
+            ItemRequest itemRequest = new ItemRequest(clone, clone.getMaxStackSize());
+            ItemStack retrieved = definition.getNode().getRoot().getItemStack(blockMenu.getLocation(), itemRequest);
+            if (retrieved != null) {
+               BlockMenuUtil.pushItem(blockMenu, retrieved, 24);
+            }
+
+            this.sendFeedback(blockMenu.getLocation(), FeedbackType.WORKING);
+         } else {
+            this.sendFeedback(blockMenu.getLocation(), FeedbackType.NO_TEMPLATE_FOUND);
+         }
+      }
+   }
+
+   public void postRegister() {
+      new BlockMenuPreset(this.getId(), this.getItemName()) {
+         public void init() {
+            this.drawBackground(NetworkExport.BACKGROUND_SLOTS);
+            this.drawBackground(Icon.EXPORT_TEMPLATE_BACKGROUND_STACK, NetworkExport.TEST_ITEM_BACKDROP);
+            this.drawBackground(Icon.EXPORT_OUTPUT_BACKGROUND_STACK, NetworkExport.OUTPUT_ITEM_BACKDROP);
+         }
+
+         public boolean canOpen(@NotNull Block block, @NotNull Player player) {
+            return player.hasPermission("slimefun.inventory.bypass")
+               || NetworkSlimefunItems.NETWORK_EXPORT.canUse(player, false)
+                  && Slimefun.getProtectionManager().hasPermission(player, block.getLocation(), Interaction.INTERACT_BLOCK);
+         }
+
+         public int[] getSlotsAccessedByItemTransport(ItemTransportFlow flow) {
+            return flow == ItemTransportFlow.WITHDRAW ? new int[]{24} : new int[0];
+         }
+      };
+   }
+}

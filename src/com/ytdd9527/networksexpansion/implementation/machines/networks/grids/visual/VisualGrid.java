@@ -1,0 +1,216 @@
+package com.ytdd9527.networksexpansion.implementation.machines.networks.grids.visual;
+
+import com.balugaq.bim.grid.ActiveGrid;
+import com.balugaq.netex.api.keybind.Keybindable;
+import com.balugaq.netex.api.keybind.Keybinds;
+import com.xzavier0722.mc.plugin.slimefun4.storage.controller.SlimefunBlockData;
+import com.ytdd9527.networksexpansion.core.items.machines.AbstractGridNewStyle;
+import io.github.sefiraat.networks.NetworkStorage;
+import io.github.sefiraat.networks.network.NetworkRoot;
+import io.github.sefiraat.networks.network.NodeDefinition;
+import io.github.sefiraat.networks.network.NodeType;
+import io.github.sefiraat.networks.slimefun.network.grid.GridCache;
+import io.github.thebusybiscuit.slimefun4.api.items.ItemGroup;
+import io.github.thebusybiscuit.slimefun4.api.items.ItemHandler;
+import io.github.thebusybiscuit.slimefun4.api.items.SlimefunItem;
+import io.github.thebusybiscuit.slimefun4.api.items.SlimefunItemStack;
+import io.github.thebusybiscuit.slimefun4.api.recipes.RecipeType;
+import io.github.thebusybiscuit.slimefun4.core.handlers.BlockBreakHandler;
+import io.github.thebusybiscuit.slimefun4.core.handlers.BlockPlaceHandler;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import me.mrCookieSlime.Slimefun.Objects.handlers.BlockTicker;
+import me.mrCookieSlime.Slimefun.api.inventory.BlockMenuPreset;
+import org.bukkit.Location;
+import org.bukkit.block.Block;
+import org.bukkit.entity.Item;
+import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.inventory.ItemStack;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
+
+@NullMarked
+public class VisualGrid extends AbstractGridNewStyle implements Keybindable {
+   private static final VisualGridPreset PRESET = new VisualGridPreset();
+   static final int[] BACKGROUND_SLOTS = new int[]{17, 26, 35};
+   private static final int[] DISPLAY_SLOTS = new int[]{
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43,
+      45,
+      46,
+      47,
+      48,
+      49,
+      50,
+      51,
+      52,
+      54,
+      55,
+      56,
+      57,
+      58,
+      59,
+      60,
+      61,
+      63,
+      64,
+      65,
+      66,
+      67,
+      68,
+      69,
+      70,
+      72,
+      73,
+      74,
+      75,
+      76,
+      77,
+      78,
+      79
+   };
+   static final int KEYBIND_BUTTON_SLOT = 8;
+   static final int CHANGE_SORT = 62;
+   static final int FILTER = 53;
+   static final int PAGE_PREVIOUS = 71;
+   static final int PAGE_NEXT = 80;
+   static final int TOGGLE_MODE_SLOT = 44;
+   private static final Map<Location, GridCache> CACHE_MAP = new HashMap<>();
+
+   public VisualGrid(ItemGroup itemGroup, SlimefunItemStack item, RecipeType recipeType, ItemStack[] recipe) {
+      super(itemGroup, item, recipeType, recipe, NodeType.VISUAL_GRID);
+      this.addItemHandler(new ItemHandler[]{new BlockPlaceHandler(false) {
+         public void onPlayerPlace(BlockPlaceEvent e) {
+            e.setCancelled(true);
+         }
+      }});
+      this.addItemHandler(new ItemHandler[]{new BlockBreakHandler(false, false) {
+         public void onPlayerBreak(BlockBreakEvent e, ItemStack item, List<ItemStack> drops) {
+         }
+      }});
+      this.addItemHandler(new ItemHandler[]{new BlockTicker() {
+         private int tick = 1;
+
+         public boolean isSynchronized() {
+            return false;
+         }
+
+         public void tick(Block block, SlimefunItem item, SlimefunBlockData data) {
+         }
+
+         public void uniqueTick() {
+            this.tick = this.tick <= 1 ? (Integer)VisualGrid.this.tickRate.getValue() : this.tick - 1;
+         }
+      }});
+   }
+
+   public void tryAddItem(Location location, ActiveGrid active) {
+      NodeDefinition node = NetworkStorage.getNode(location);
+      if (node != null && node.getNode() != null) {
+         NetworkRoot root = node.getNode().getRoot();
+
+         for (Item e : active.getLocation().getWorld().getNearbyEntitiesByType(Item.class, active.getLocation(), 1.0, 1.0, 1.0)) {
+            root.addItemStack(location, e.getItemStack());
+            if (e.getItemStack().getAmount() == 0) {
+               e.remove();
+            }
+         }
+      }
+   }
+
+   @Nullable
+   @Override
+   protected BlockMenuPreset getPreset() {
+      return null;
+   }
+
+   @Override
+   public Map<Location, GridCache> getCacheMap() {
+      return CACHE_MAP;
+   }
+
+   @Override
+   public int[] getBackgroundSlots() {
+      return BACKGROUND_SLOTS;
+   }
+
+   @Override
+   public int[] getDisplaySlots() {
+      return DISPLAY_SLOTS;
+   }
+
+   @Override
+   public int getChangeSort() {
+      return 62;
+   }
+
+   @Override
+   public int getPagePrevious() {
+      return 71;
+   }
+
+   @Override
+   public int getPageNext() {
+      return 80;
+   }
+
+   @Override
+   public int getKeybindButtonSlot() {
+      return 8;
+   }
+
+   @Override
+   public int getToggleModeSlot() {
+      return 44;
+   }
+
+   @Override
+   protected int getFilterSlot() {
+      return 53;
+   }
+
+   @Override
+   public List<Keybinds> keybinds() {
+      return List.of(this.displayKeybinds(), this.outsideKeybinds());
+   }
+}

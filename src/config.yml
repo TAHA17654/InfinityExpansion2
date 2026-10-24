@@ -1,0 +1,246 @@
+# Auto update from Guizhan Build is enabled by default.
+auto-update: true
+
+# Language
+language: zh-CN
+
+# Do not change this value unless you know what you are doing.
+config-version: 2.1.68
+
+# Do not change this value unless you know what you are doing.
+debug: false
+
+grid-new-style-max-custom-amount: 2304
+
+use-bukkit-item-comparison: false
+
+ban-quantum-in-quantum: false
+
+drawer-auto-save-period: 300
+
+disable-profile-check: false
+
+fast-interact-quantum: true
+
+# Pinyin search switch: when disabled, item search only matches the original name and no longer does pinyin / pinyin-initial matching (saves the runtime overhead of the pinyin library).
+enable-pinyin-search: true
+
+# Cell Network settings
+cellnet:
+  # Maximum number of item types a cell can be upgraded to. A new cell starts with 1 type, +1 per Quantum Storage, up to this limit.
+  max-item-types: 64
+  # Assembly Drive batch retrieval: when enabled, one round of missing materials is merged into a single network walk (the order of deduction sources may differ from older versions; the total amount retrieved is unchanged).
+  # When disabled, the old per-material path is used. Can be turned off at any time to roll back if something goes wrong.
+  assembly-batch-fetch: true
+
+# Cell Network persistence (SQLite)
+cellnet-storage:
+  wal-mode: true
+  busy-timeout: 5000
+  write-timeout-seconds: 10
+  journal-retention-minutes: 30
+  archive-enabled: true
+  archive-retention-days: 7
+  archive-max-rows: 2000000
+  checkpoint-interval: 60
+  checkpoint-threshold: 5000
+  backup-enabled: true
+  backup-interval-hours: 24
+  # Number of backups to keep; the oldest are deleted first when exceeded; <= 0 means no cleanup
+  backup-keep: 10
+
+rpg-fix:
+  force-check-lore: false
+
+speed-up:
+  persistent-threshold: 15
+  cache-miss-threshold: 15
+  soft-cell-ban: false
+  soft-cell-ban-threshold: 0
+
+speed-down:
+  transport-miss-threshold: 120
+  reduce-ms: 8000
+
+# Chain transfer framework: base-distance = base distance (blocks), distance-per-module = distance bonus per module,
+# max-distance = hard distance cap, cache-ttl-ticks = target cache lifetime (SF ticks), idle-ttl-ticks = idle line sleep lifetime
+# Template slots are fixed: 3 base slots, +3 per expansion module, 9 at most (not configurable)
+# work-interval-seconds = work interval (seconds). 0 = full efficiency (default); 1~60 = work once every N seconds
+chain:
+  base-distance: 16
+  distance-per-module: 16
+  max-distance: 64
+  cache-ttl-ticks: 40
+  idle-ttl-ticks: 200
+  work-interval-seconds: 0
+
+# Network Rune [Collect]: use weapons/tools crafted with the rune to kill mobs and mine; drops are collected into the bound network
+collect-rune:
+  enabled: true
+
+record-gc:
+  threshold: 131072
+  deadline: 120000 # milliseconds
+
+# max-distance means the max distance that the transfer can access. Unit: Block
+# pushitem-tick means the interval time to push. Unit: SF Tick
+# grabitem-tick means the interval time to grab. Unit: SF Tick
+# required-power means the power required to tick. Unit: J
+# 1 SF Tick = 0.5 seconds
+items:
+  NTW_EXPANSION_LINE_TRANSFER_PUSHER:
+    max-distance: 32
+    pushitem-tick: 1
+  NTW_EXPANSION_LINE_TRANSFER_MORE_PUSHER:
+    max-distance: 32
+    pushitem-tick: 1
+  NTW_EXPANSION_LINE_TRANSFER_BEST_PUSHER:
+    max-distance: 32
+    pushitem-tick: 1
+  NTW_EXPANSION_LINE_TRANSFER_GRABBER:
+    max-distance: 32
+    grabitem-tick: 1
+  NTW_EXPANSION_LINE_TRANSFER:
+    max-distance: 32
+    pushitem-tick: 1
+    grabitem-tick: 1
+  NTW_EXPANSION_LINE_TRANSFER_PLUS_PUSHER:
+    max-distance: 64
+    pushitem-tick: 1
+  NTW_EXPANSION_LINE_TRANSFER_PLUS_MORE_PUSHER:
+    max-distance: 64
+    pushitem-tick: 1
+  NTW_EXPANSION_LINE_TRANSFER_PLUS_BEST_PUSHER:
+    max-distance: 64
+    pushitem-tick: 1
+  NTW_EXPANSION_LINE_TRANSFER_PLUS_GRABBER:
+    max-distance: 64
+    grabitem-tick: 1
+  NTW_EXPANSION_LINE_TRANSFER_PLUS:
+    max-distance: 64
+    pushitem-tick: 1
+    grabitem-tick: 1
+    required-power: 5000
+  NTW_EXPANSION_ADVANCED_LINE_TRANSFER_PUSHER:
+    max-distance: 32
+    pushitem-tick: 1
+  NTW_EXPANSION_ADVANCED_LINE_TRANSFER_MORE_PUSHER:
+    max-distance: 32
+    pushitem-tick: 1
+  NTW_EXPANSION_ADVANCED_LINE_TRANSFER_BEST_PUSHER:
+    max-distance: 32
+    pushitem-tick: 1
+  NTW_EXPANSION_ADVANCED_LINE_TRANSFER_GRABBER:
+    max-distance: 32
+    grabitem-tick: 1
+  NTW_EXPANSION_ADVANCED_LINE_TRANSFER:
+    max-distance: 32
+    pushitem-tick: 1
+    grabitem-tick: 1
+  NTW_EXPANSION_ADVANCED_LINE_TRANSFER_PLUS_PUSHER:
+    max-distance: 64
+    pushitem-tick: 1
+  NTW_EXPANSION_ADVANCED_LINE_TRANSFER_PLUS_MORE_PUSHER:
+    max-distance: 64
+    pushitem-tick: 1
+  NTW_EXPANSION_ADVANCED_LINE_TRANSFER_PLUS_BEST_PUSHER:
+    max-distance: 64
+    pushitem-tick: 1
+  NTW_EXPANSION_ADVANCED_LINE_TRANSFER_PLUS_GRABBER:
+    max-distance: 64
+    grabitem-tick: 1
+  NTW_EXPANSION_ADVANCED_LINE_TRANSFER_PLUS:
+    max-distance: 64
+    pushitem-tick: 1
+    grabitem-tick: 1
+    required-power: 5000
+  NTW_EXPANSION_LINE_TRANSFER_VANILLA_PUSHER:
+    max-distance: 32
+    pushitem-tick: 1
+  NTW_EXPANSION_LINE_TRANSFER_VANILLA_GRABBER:
+    max-distance: 32
+    grabitem-tick: 1
+  NTW_EXPANSION_ADVANCED_LINE_TRANSFER_VANILLA_PUSHER:
+    max-distance: 32
+    pushitem-tick: 1
+  NTW_EXPANSION_ADVANCED_LINE_TRANSFER_VANILLA_GRABBER:
+    max-distance: 32
+    grabitem-tick: 1
+  NTW_EXPANSION_ADVANCED_LINE_TRANSFER_VANILLA_PLUS_PUSHER:
+    max-distance: 64
+    pushitem-tick: 1
+  NTW_EXPANSION_ADVANCED_LINE_TRANSFER_VANILLA_PLUS_GRABBER:
+    max-distance: 64
+    grabitem-tick: 1
+  CARGO_STORAGE_UNIT_1_MODEL:
+    use-special-model:
+      enable: true
+  CARGO_STORAGE_UNIT_2_MODEL:
+    use-special-model:
+      enable: true
+  CARGO_STORAGE_UNIT_3_MODEL:
+    use-special-model:
+      enable: true
+  CARGO_STORAGE_UNIT_4_MODEL:
+    use-special-model:
+      enable: true
+  CARGO_STORAGE_UNIT_5_MODEL:
+    use-special-model:
+      enable: true
+  CARGO_STORAGE_UNIT_6_MODEL:
+    use-special-model:
+      enable: true
+  CARGO_STORAGE_UNIT_7_MODEL:
+    use-special-model:
+      enable: true
+  CARGO_STORAGE_UNIT_8_MODEL:
+    use-special-model:
+      enable: true
+  CARGO_STORAGE_UNIT_9_MODEL:
+    use-special-model:
+      enable: true
+  CARGO_STORAGE_UNIT_10_MODEL:
+    use-special-model:
+      enable: true
+  CARGO_STORAGE_UNIT_11_MODEL:
+    use-special-model:
+      enable: true
+  CARGO_STORAGE_UNIT_12_MODEL:
+    use-special-model:
+      enable: true
+  CARGO_STORAGE_UNIT_13_MODEL:
+    use-special-model:
+      enable: true
+  NTW_EXPANSION_LINE_POWER_OUTLET_1:
+    max-distance: 32
+    rate: 64
+  NTW_EXPANSION_LINE_POWER_OUTLET_2:
+    max-distance: 32
+    rate: 256
+  NTW_EXPANSION_LINE_POWER_OUTLET_3:
+    max-distance: 32
+    rate: 1024
+  NTW_EXPANSION_LINE_POWER_OUTLET_4:
+    max-distance: 32
+    rate: 4096
+  NTW_EXPANSION_LINE_POWER_OUTLET_5:
+    max-distance: 32
+    rate: 32768
+  NTW_EXPANSION_LINE_POWER_OUTLET_6:
+    max-distance: 32
+    rate: 262144
+  NTW_EXPANSION_LINE_POWER_OUTLET_7:
+    max-distance: 32
+    rate: 2097152
+  NTW_EXPANSION_LINE_POWER_OUTLET_8:
+    max-distance: 32
+    rate: 16777216
+  NTW_EXPANSION_LINE_POWER_OUTLET_9:
+    max-distance: 32
+    rate: 134217728
+  NTW_EXPANSION_LINE_POWER_OUTLET_10:
+    max-distance: 32
+    rate: 1073741824
+  NTW_EXPANSION_LINE_POWER_OUTLET_11:
+    max-distance: 32
+    rate: 2147483647

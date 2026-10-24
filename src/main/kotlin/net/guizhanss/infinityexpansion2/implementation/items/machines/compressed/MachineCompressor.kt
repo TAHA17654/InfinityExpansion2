@@ -3,6 +3,8 @@ package net.guizhanss.infinityexpansion2.implementation.items.machines.compresse
 import io.github.thebusybiscuit.slimefun4.api.items.ItemGroup
 import io.github.thebusybiscuit.slimefun4.api.items.SlimefunItemStack
 import io.github.thebusybiscuit.slimefun4.api.recipes.RecipeType
+import net.guizhanss.guizhanlib.kt.slimefun.items.edit
+import net.guizhanss.guizhanlib.kt.slimefun.items.toItem
 import net.guizhanss.infinityexpansion2.core.IERegistry
 import net.guizhanss.infinityexpansion2.implementation.items.machines.abstracts.HopperMachine
 import org.bukkit.inventory.ItemStack
@@ -25,8 +27,8 @@ class MachineCompressor(
 
     init {
         for ((base, compressed) in IERegistry.compressedMachines) {
-            val input = base.clone().apply { amount = CompressedMachines.FACTOR }
-            addRecipe(input, compressed.clone())
+            val input = base.edit { amount(CompressedMachines.FACTOR) }
+            addRecipe(input, compressed.toItem())
         }
     }
 }

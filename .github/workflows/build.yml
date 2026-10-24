@@ -13,7 +13,15 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: maven
-      - run: mvn -B package
+      - name: Build
+        run: |
+          set +e
+          mvn -B package > build.log 2>&1
+          code=$?
+          if [ $code -ne 0 ]; then
+            grep -E "ERROR|BUILD" build.log | head -25 | while IFS= read -r l; do echo "::error::${l:0:400}"; done
+          fi
+          exit $code
       - uses: actions/upload-artifact@v4
         with:
           name: MachineStacker
